@@ -14,6 +14,7 @@ No installer, no runtime download, no bloat. It's a single ~12 KB `.exe` that si
 
 - **One hotkey** — `Alt + A` from anywhere brings up the capture overlay.
 - **Freeze-frame selection** — the screen freezes and dims; your selection stays bright, with a live pixel-size readout.
+- **Adjust the box** — drag inside to move it, or grab any of the 8 handles to resize. Drag outside to start over.
 - **Annotate before you copy** — arrow, line, rectangle, and text tools for pointing things out, in a clean borderless toolbar. Type a note next to your arrow (full IME support). `Undo` (or `Ctrl + Z`) removes the last mark.
 - **Confirm your way** — click ✓ or hit `Enter` to copy; click ✗ or hit `Esc` to cancel.
 - **Straight to clipboard** — paste into WeChat, chat apps, docs, image editors, anywhere with `Ctrl + V`.
@@ -69,6 +70,7 @@ On the hotkey, the whole virtual screen (all monitors) is copied into a bitmap. 
 
 - **一个热键** —— 任何地方按 `Alt + A` 唤起截图遮罩。
 - **冻结取景** —— 屏幕冻结变暗,选区保持清晰,实时显示像素尺寸。
+- **调整选框** —— 框内拖动整体移动,拖 8 个控制点缩放,框外拖动重新框选;截歪了不用重来。
 - **复制前先标注** —— 箭头、直线、方框、文字四种标注工具,截图时随手"指一下"再打字说明(支持中文输入法);无边框极简工具条,`撤销`(或 `Ctrl + Z`)删掉上一笔。
 - **随你确认** —— 点 ✓ 或按 `Enter` 复制;点 ✗ 或按 `Esc` 取消。
 - **直达剪贴板** —— 微信、聊天软件、文档、图片编辑器,`Ctrl + V` 直接粘。

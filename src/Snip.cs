@@ -167,6 +167,13 @@ namespace SnipTool
         Anno _drawing = null;     // 正在画的标注
         bool _annotating = false;
 
+        // 选框的移动/缩放（仅未选标注工具时）
+        bool _moving = false, _resizing = false;
+        int _handle = -1;         // 0 TL 1 TC 2 TR 3 RC 4 BR 5 BC 6 BL 7 LC
+        Point _dragOrigin;
+        Rectangle _selOrig;
+        const int HS = 8;         // 控制点大小
+
         // 工具条按钮：id 1箭头 2直线 3方框 7文字 4撤销 5取消 6确认
         int _hover = 0;
         Rectangle _bar = Rectangle.Empty;
@@ -234,6 +241,73 @@ namespace SnipTool
             return 0;
         }
 
+        // 8 个控制点（0 TL 1 TC 2 TR 3 RC 4 BR 5 BC 6 BL 7 LC）
+        Point[] HandlePoints()
+        {
+            int l = _sel.Left, t = _sel.Top, r = _sel.Right, b = _sel.Bottom;
+            int cx = l + _sel.Width / 2, cy = t + _sel.Height / 2;
+            return new[]
+            {
+                new Point(l, t), new Point(cx, t), new Point(r, t),
+                new Point(r, cy), new Point(r, b), new Point(cx, b),
+                new Point(l, b), new Point(l, cy)
+            };
+        }
+
+        Rectangle HandleRect(Point p) { return new Rectangle(p.X - HS / 2, p.Y - HS / 2, HS, HS); }
+
+        int HitHandle(Point pt)
+        {
+            if (!_hasSel) return -1;
+            var pts = HandlePoints();
+            for (int i = 0; i < 8; i++)
+            {
+                var hr = HandleRect(pts[i]); hr.Inflate(3, 3);
+                if (hr.Contains(pt)) return i;
+            }
+            return -1;
+        }
+
+        Cursor HandleCursor(int h)
+        {
+            switch (h)
+            {
+                case 0: case 4: return Cursors.SizeNWSE;
+                case 2: case 6: return Cursors.SizeNESW;
+                case 1: case 5: return Cursors.SizeNS;
+                default: return Cursors.SizeWE; // 3, 7
+            }
+        }
+
+        Rectangle ResizeRect(Rectangle o, int h, Point pt)
+        {
+            int l = o.Left, t = o.Top, r = o.Right, b = o.Bottom;
+            switch (h)
+            {
+                case 0: l = pt.X; t = pt.Y; break;
+                case 1: t = pt.Y; break;
+                case 2: r = pt.X; t = pt.Y; break;
+                case 3: r = pt.X; break;
+                case 4: r = pt.X; b = pt.Y; break;
+                case 5: b = pt.Y; break;
+                case 6: l = pt.X; b = pt.Y; break;
+                case 7: l = pt.X; break;
+            }
+            l = Math.Max(0, Math.Min(l, this.Width)); r = Math.Max(0, Math.Min(r, this.Width));
+            t = Math.Max(0, Math.Min(t, this.Height)); b = Math.Max(0, Math.Min(b, this.Height));
+            return new Rectangle(Math.Min(l, r), Math.Min(t, b), Math.Abs(r - l), Math.Abs(b - t));
+        }
+
+        void DrawHandles(Graphics g)
+        {
+            foreach (var p in HandlePoints())
+            {
+                var hr = HandleRect(p);
+                using (var b = new SolidBrush(C_GOLD)) g.FillRectangle(b, hr);
+                using (var pen = new Pen(Color.FromArgb(180, C_DEEP), 1f)) g.DrawRectangle(pen, hr);
+            }
+        }
+
         void OnDown(object s, MouseEventArgs e)
         {
             if (e.Button != MouseButtons.Left) return;
@@ -246,6 +320,21 @@ namespace SnipTool
                 int id = HitButton(e.Location);
                 if (id != 0) { HandleButton(id); return; }
 
+                // 未选工具时：拖角缩放 / 框内移动
+                if (_tool == Tool.None)
+                {
+                    int hd = HitHandle(e.Location);
+                    if (hd >= 0)
+                    {
+                        _resizing = true; _handle = hd; _selOrig = _sel;
+                        return;
+                    }
+                    if (_sel.Contains(e.Location))
+                    {
+                        _moving = true; _dragOrigin = e.Location; _selOrig = _sel;
+                        return;
+                    }
+                }
                 // 文字工具：在点击处开一个输入框
                 if (_tool == Tool.Text && _sel.Contains(e.Location))
                 {
@@ -283,6 +372,19 @@ namespace SnipTool
                 this.Invalidate();
                 return;
             }
+            if (_moving)
+            {
+                var r = _selOrig;
+                r.X = Math.Max(0, Math.Min(_selOrig.X + (e.X - _dragOrigin.X), this.Width - r.Width));
+                r.Y = Math.Max(0, Math.Min(_selOrig.Y + (e.Y - _dragOrigin.Y), this.Height - r.Height));
+                _sel = r; LayoutButtons(); this.Invalidate();
+                return;
+            }
+            if (_resizing)
+            {
+                _sel = ResizeRect(_selOrig, _handle, e.Location); LayoutButtons(); this.Invalidate();
+                return;
+            }
             if (_annotating)
             {
                 _drawing.B = e.Location;
@@ -293,6 +395,13 @@ namespace SnipTool
             {
                 int id = HitButton(e.Location);
                 if (id != 0) this.Cursor = Cursors.Hand;
+                else if (_tool == Tool.None)
+                {
+                    int hd = HitHandle(e.Location);
+                    if (hd >= 0) this.Cursor = HandleCursor(hd);
+                    else if (_sel.Contains(e.Location)) this.Cursor = Cursors.SizeAll;
+                    else this.Cursor = Cursors.Cross;
+                }
                 else if (_tool == Tool.Text && _sel.Contains(e.Location)) this.Cursor = Cursors.IBeam;
                 else this.Cursor = Cursors.Cross;
                 if (id != _hover) { _hover = id; this.Invalidate(); }
@@ -306,6 +415,13 @@ namespace SnipTool
                 _dragging = false;
                 if (_sel.Width >= 3 && _sel.Height >= 3) { _hasSel = true; LayoutButtons(); }
                 else { _sel = Rectangle.Empty; _hasSel = false; }
+                this.Invalidate();
+                return;
+            }
+            if (_moving || _resizing)
+            {
+                _moving = false; _resizing = false; _handle = -1;
+                LayoutButtons();
                 this.Invalidate();
                 return;
             }
@@ -489,6 +605,9 @@ namespace SnipTool
                         g.DrawString(info, f, fg, tx + 5, ty + 1);
                     }
                 }
+
+                // 控制点：未选标注工具、且非拖框中时显示，提示可移动/缩放
+                if (_hasSel && _tool == Tool.None && !_dragging) DrawHandles(g);
 
                 if (_hasSel) DrawToolbar(g);
             }
@@ -699,7 +818,7 @@ namespace SnipTool
             f.Bounds = new Rectangle(0, 0, W, H);
             f._sel = new Rectangle(120, 95, 300, 175);
             f._hasSel = true;
-            f._tool = Tool.Text;
+            f._tool = Tool.None;
             f._annos.Add(new Anno { Type = Tool.Arrow, A = new Point(390, 250), B = new Point(250, 160) });
             f._annos.Add(new Anno { Type = Tool.Rect, A = new Point(150, 120), B = new Point(240, 175) });
             f._annos.Add(new Anno { Type = Tool.Text, A = new Point(300, 255), Text = "看这里" });
