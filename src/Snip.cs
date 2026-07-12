@@ -6,20 +6,39 @@ using System.Windows.Forms;
 
 namespace SnipTool
 {
-    // 托盘常驻程序：注册全局热键 Alt + A，触发截图
+    // 托盘常驻程序：用底层键盘钩子(WH_KEYBOARD_LL)抢在其它程序(如微信)之前拦截 Alt+A。
+    // 系统会先把按键送到本钩子，命中 Alt+A 时触发截图并“吞掉”该键，
+    // 因此谁用 RegisterHotKey 抢注 Alt+A 都无效，本工具始终优先。
+    // 注意：钩子只判断“是不是 Alt+A”，不记录任何按键内容，非键盘记录器。
     public class TrayApp : Form
     {
-        [DllImport("user32.dll")] static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
-        [DllImport("user32.dll")] static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+        const int WH_KEYBOARD_LL = 13;
+        const int WM_KEYDOWN = 0x0100;
+        const int WM_SYSKEYDOWN = 0x0104;
+        const int VK_A = 0x41;
+        const int VK_MENU = 0x12;   // Alt
+        const int LLKHF_INJECTED = 0x10;
 
-        const int WM_HOTKEY = 0x0312;
-        const int HOTKEY_ID = 0xA11A;
-        const uint MOD_ALT = 0x0001;
-        const uint MOD_NOREPEAT = 0x4000;
-        const uint VK_A = 0x41;
+        [StructLayout(LayoutKind.Sequential)]
+        struct KBDLLHOOKSTRUCT { public uint vkCode; public uint scanCode; public uint flags; public uint time; public IntPtr dwExtraInfo; }
+
+        delegate IntPtr HookProc(int nCode, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern IntPtr SetWindowsHookEx(int idHook, HookProc lpfn, IntPtr hMod, uint dwThreadId);
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern bool UnhookWindowsHookEx(IntPtr hhk);
+        [DllImport("user32.dll")]
+        static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+        [DllImport("user32.dll")]
+        static extern short GetAsyncKeyState(int vKey);
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
+        static extern IntPtr GetModuleHandle(string lpModuleName);
 
         NotifyIcon _tray;
         bool _capturing = false;
+        IntPtr _hook = IntPtr.Zero;
+        HookProc _proc;   // 保持引用，防止被 GC 回收导致钩子失效
 
         public TrayApp()
         {
@@ -42,20 +61,32 @@ namespace SnipTool
             _tray.ContextMenuStrip = menu;
             _tray.DoubleClick += (s, e) => StartCapture();
 
-            if (!RegisterHotKey(this.Handle, HOTKEY_ID, MOD_ALT | MOD_NOREPEAT, VK_A))
+            // 安装底层键盘钩子
+            _proc = HookCallback;
+            _hook = SetWindowsHookEx(WH_KEYBOARD_LL, _proc, GetModuleHandle(null), 0);
+            if (_hook == IntPtr.Zero)
             {
-                MessageBox.Show("热键 Alt+A 注册失败，可能已被其它程序占用。\n你仍可双击托盘图标截图。",
+                MessageBox.Show("键盘钩子安装失败，Alt+A 可能不生效。\n你仍可双击托盘图标截图。",
                     "截图工具", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
-        protected override void WndProc(ref Message m)
+        IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
         {
-            if (m.Msg == WM_HOTKEY && (int)m.WParam == HOTKEY_ID)
+            if (nCode >= 0 && (wParam == (IntPtr)WM_KEYDOWN || wParam == (IntPtr)WM_SYSKEYDOWN))
             {
-                StartCapture();
+                var kb = (KBDLLHOOKSTRUCT)Marshal.PtrToStructure(lParam, typeof(KBDLLHOOKSTRUCT));
+                // 命中 A 键 + 当前 Alt 处于按下状态；忽略程序注入的假按键
+                if (kb.vkCode == VK_A && (kb.flags & LLKHF_INJECTED) == 0
+                    && (GetAsyncKeyState(VK_MENU) & 0x8000) != 0)
+                {
+                    // 交给 UI 线程截图，并吞掉这个按键（微信等收不到）
+                    if (!_capturing)
+                        this.BeginInvoke((Action)StartCapture);
+                    return (IntPtr)1;
+                }
             }
-            base.WndProc(ref m);
+            return CallNextHookEx(_hook, nCode, wParam, lParam);
         }
 
         void StartCapture()
@@ -82,7 +113,7 @@ namespace SnipTool
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
-            UnregisterHotKey(this.Handle, HOTKEY_ID);
+            if (_hook != IntPtr.Zero) { UnhookWindowsHookEx(_hook); _hook = IntPtr.Zero; }
             base.OnFormClosing(e);
         }
 
