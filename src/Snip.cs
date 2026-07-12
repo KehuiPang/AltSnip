@@ -174,15 +174,10 @@ namespace SnipTool
         readonly Rectangle[] _rects = new Rectangle[7];
         const int BTN = 42;
 
-        // 文字标注：用真输入框（保证中文输入法可用），但把它背后的冻结原图
-        // 画成自己的背景 => 看起来完全透明；配合红字、红光标。
+        // 文字标注：用真输入框（保证中文输入法可用）。底色取自点击处背后的原图，
+        // 在纯色背景上看着就是透明；宽度随字数自动伸缩，不留长条。
         static readonly Font AnnoFont = new Font("Microsoft YaHei", 13.5f);
-        ClearTextBox _tb = null;
-
-        const int WM_CTLCOLOREDIT = 0x0133;
-        [DllImport("gdi32.dll")] static extern int SetBkMode(IntPtr hdc, int mode);
-        [DllImport("gdi32.dll")] static extern uint SetTextColor(IntPtr hdc, int color);
-        [DllImport("gdi32.dll")] static extern IntPtr GetStockObject(int i);
+        TextBox _tb = null;
 
         // 暖琥珀 VI
         static readonly Color C_GOLD   = Color.FromArgb(0xf4, 0xb7, 0x40);
@@ -211,20 +206,6 @@ namespace SnipTool
             this.MouseMove += OnMove;
             this.MouseUp += OnUp;
             this.KeyDown += OnKey;
-        }
-
-        // 让文字输入框的字背景透明（不盖住我们画上去的原图背景），并把字设成红色
-        protected override void WndProc(ref Message m)
-        {
-            if (m.Msg == WM_CTLCOLOREDIT)
-            {
-                SetBkMode(m.WParam, 1);                 // TRANSPARENT
-                int bgr = C_ANNO.R | (C_ANNO.G << 8) | (C_ANNO.B << 16);
-                SetTextColor(m.WParam, bgr);
-                m.Result = GetStockObject(5);           // NULL_BRUSH
-                return;
-            }
-            base.WndProc(ref m);
         }
 
         void OnKey(object s, KeyEventArgs e)
@@ -370,31 +351,45 @@ namespace SnipTool
                 _rects[i] = new Rectangle(bx + i * BTN, by, BTN, BTN);
         }
 
-        // ---- 文字标注输入（真控件 + 透明背景 + 红光标）----
+        // ---- 文字标注输入（真控件，底色贴合背景，宽度自适应）----
         void BeginText(Point p)
         {
             CommitText();
-            _tb = new ClearTextBox();
-            _tb.BorderStyle = BorderStyle.None;
-            _tb.Multiline = false;
-            _tb.Font = AnnoFont;
-            _tb.ForeColor = C_ANNO;
-            _tb.Location = p;
-            _tb.Width = Math.Min(320, Math.Max(60, _sel.Right - p.X - 4));
-            this.Controls.Add(_tb);
-
-            // 把输入框背后的冻结原图截下来当它的背景 => 视觉上完全透明
-            int h = _tb.Height;
-            Rectangle rb = new Rectangle(p.X, p.Y, _tb.Width, h);
-            rb.Intersect(new Rectangle(0, 0, _full.Width, _full.Height));
-            if (rb.Width > 0 && rb.Height > 0)
+            var tb = new TextBox();
+            tb.BorderStyle = BorderStyle.None;
+            tb.Multiline = false;
+            tb.Font = AnnoFont;
+            tb.ForeColor = C_ANNO;
+            tb.Location = p;
+            tb.Width = 24;   // 起始很窄，随打字增长
+            this.Controls.Add(tb);
+            tb.BackColor = SampleBg(new Rectangle(tb.Left, tb.Top, tb.Width, tb.Height));
+            tb.TextChanged += (s, e) =>
             {
-                var bg = new Bitmap(_tb.Width, h);
-                using (var g = Graphics.FromImage(bg))
-                    g.DrawImage(_full, new Rectangle(0, 0, rb.Width, rb.Height), rb, GraphicsUnit.Pixel);
-                _tb.Bg = bg;
-            }
+                int w = TextRenderer.MeasureText(tb.Text, AnnoFont).Width + 14;
+                w = Math.Max(24, Math.Min(_sel.Right - tb.Left - 2, w));
+                tb.Width = w;
+                tb.BackColor = SampleBg(new Rectangle(tb.Left, tb.Top, tb.Width, tb.Height));
+            };
+            _tb = tb;
             _tb.Focus();
+        }
+
+        // 取一小块区域的平均色（背景纯色时看起来就像透明）
+        Color SampleBg(Rectangle r)
+        {
+            r.Intersect(new Rectangle(0, 0, _full.Width, _full.Height));
+            if (r.Width <= 0 || r.Height <= 0) return Color.White;
+            long tr = 0, tg = 0, tb = 0; int n = 0;
+            int sx = Math.Max(1, r.Width / 20), sy = Math.Max(1, r.Height / 6);
+            for (int y = r.Top; y < r.Bottom; y += sy)
+                for (int x = r.Left; x < r.Right; x += sx)
+                {
+                    Color c = _full.GetPixel(x, y);
+                    tr += c.R; tg += c.G; tb += c.B; n++;
+                }
+            if (n == 0) return Color.White;
+            return Color.FromArgb((int)(tr / n), (int)(tg / n), (int)(tb / n));
         }
 
         void CommitText()
@@ -719,48 +714,4 @@ namespace SnipTool
         }
     }
 
-    // 透明输入框：因为截图是冻结静止的，把它背后那块原图画成自己的背景，
-    // 看起来就完全透明；再配一个红色光标。真控件 => 中文输入法照常工作。
-    class ClearTextBox : TextBox
-    {
-        public Bitmap Bg;
-
-        [DllImport("user32.dll")] static extern bool CreateCaret(IntPtr hWnd, IntPtr hBitmap, int w, int h);
-        [DllImport("user32.dll")] static extern bool ShowCaret(IntPtr hWnd);
-        [DllImport("gdi32.dll")] static extern IntPtr CreateSolidBrush(int color);
-        [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr o);
-
-        const int WM_ERASEBKGND = 0x0014;
-        const int WM_SETFOCUS = 0x0007;
-
-        protected override void WndProc(ref Message m)
-        {
-            if (m.Msg == WM_ERASEBKGND && Bg != null)
-            {
-                using (var g = Graphics.FromHdc(m.WParam))
-                    g.DrawImageUnscaled(Bg, 0, 0);
-                m.Result = (IntPtr)1;
-                return;
-            }
-            base.WndProc(ref m);
-            if (m.Msg == WM_SETFOCUS)
-            {
-                // 红色光标：用一个 2px 宽的纯红位图当 caret
-                var bmp = new Bitmap(2, Math.Max(2, this.Font.Height));
-                using (var g = Graphics.FromImage(bmp))
-                    g.Clear(Color.FromArgb(0xfa, 0x51, 0x51));
-                IntPtr hb = bmp.GetHbitmap();
-                CreateCaret(this.Handle, hb, 0, 0);
-                ShowCaret(this.Handle);
-                DeleteObject(hb);
-                bmp.Dispose();
-            }
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing && Bg != null) { Bg.Dispose(); Bg = null; }
-            base.Dispose(disposing);
-        }
-    }
 }
