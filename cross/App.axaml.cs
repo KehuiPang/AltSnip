@@ -89,10 +89,9 @@ public partial class App : Application
             var screen = (cur.HasValue ? _host.Screens.ScreenFromPoint(cur.Value) : null)
                          ?? _host.Screens.Primary ?? all[0];
             var bounds = screen.Bounds;
-            double scaling = screen.Scaling;
 
             var shot = PlatformServices.Current.CaptureRegion(bounds);
-            var win = new OverlayWindow(shot, bounds, scaling);
+            var win = new OverlayWindow(shot, bounds);
             win.Closed += (_, _) => _capturing = false;
             win.Show();
             win.Activate();
