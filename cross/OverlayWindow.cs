@@ -6,13 +6,13 @@ using SkiaSharp;
 
 namespace AltSnip;
 
-/// <summary>覆盖单个屏幕的无边框全屏取景窗。用 FullScreen 精确铺满屏幕，避免手动 DPI 换算。</summary>
+/// <summary>无边框窗，铺满整个虚拟屏（所有显示器）。</summary>
 public sealed class OverlayWindow : Window
 {
     readonly OverlayControl _control;
     readonly PixelRect _bounds;
 
-    public OverlayWindow(SKBitmap shot, PixelRect bounds)
+    public OverlayWindow(SKBitmap shot, PixelRect bounds, double scaling)
     {
         _bounds = bounds;
         SystemDecorations = SystemDecorations.None;
@@ -21,7 +21,9 @@ public sealed class OverlayWindow : Window
         Topmost = true;
         Background = Brushes.Black;
         WindowStartupLocation = WindowStartupLocation.Manual;
-        Position = bounds.Position;   // 先落到目标屏幕，再全屏
+        Position = bounds.Position;
+        Width = bounds.Width / scaling;     // DIP 尺寸 = 物理 / 缩放
+        Height = bounds.Height / scaling;
 
         var textLayer = new Canvas();
         _control = new OverlayControl(shot, Close, Copy) { TextLayer = textLayer };
@@ -39,8 +41,7 @@ public sealed class OverlayWindow : Window
     protected override void OnOpened(EventArgs e)
     {
         base.OnOpened(e);
-        Position = _bounds.Position;
-        WindowState = WindowState.FullScreen;   // 精确铺满该屏幕（含任务栏区域）
+        Position = _bounds.Position;   // 某些后端 Show 后会挪位，重新钉住
         Activate();
         _control.Focus();
     }

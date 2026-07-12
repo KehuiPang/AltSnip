@@ -81,13 +81,22 @@ public partial class App : Application
         _capturing = true;
         try
         {
-            var screen = _host.Screens.Primary
-                         ?? (_host.Screens.All.Count > 0 ? _host.Screens.All[0] : null);
-            if (screen == null) { _capturing = false; return; }
+            var all = _host.Screens.All;
+            if (all == null || all.Count == 0) { _capturing = false; return; }
 
-            var bounds = screen.Bounds;
-            var shot = PlatformServices.Current.CaptureRegion(bounds);
-            var win = new OverlayWindow(shot, bounds);
+            // 覆盖整个虚拟屏（所有显示器的并集），像经典版那样，随处可框选
+            int l = int.MaxValue, t = int.MaxValue, r = int.MinValue, b = int.MinValue;
+            foreach (var s in all)
+            {
+                var bd = s.Bounds;
+                l = Math.Min(l, bd.X); t = Math.Min(t, bd.Y);
+                r = Math.Max(r, bd.X + bd.Width); b = Math.Max(b, bd.Y + bd.Height);
+            }
+            var vbounds = new PixelRect(l, t, r - l, b - t);
+            double scaling = _host.Screens.Primary?.Scaling ?? all[0].Scaling;
+
+            var shot = PlatformServices.Current.CaptureRegion(vbounds);
+            var win = new OverlayWindow(shot, vbounds, scaling);
             win.Closed += (_, _) => _capturing = false;
             win.Show();
             win.Activate();
