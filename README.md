@@ -8,14 +8,14 @@
 
 <p align="center">
   <b>Press <code>Alt&nbsp;+&nbsp;A</code>. Drag a box. It's on your clipboard.</b><br>
-  A tiny, fast, no-dependency screenshot &amp; annotation tool for Windows — in a single ~50&nbsp;KB <code>.exe</code>.
+  A fast, no-fuss screenshot &amp; annotation tool for <b>Windows, macOS, and Linux</b>.
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/github/v/release/KehuiPang/AltSnip?color=f4b740" alt="release">
-  <img src="https://img.shields.io/badge/platform-Windows-0078D6" alt="platform">
+  <img src="https://img.shields.io/badge/platform-Windows%20%C2%B7%20macOS%20%C2%B7%20Linux-0078D6" alt="platform">
   <img src="https://img.shields.io/badge/license-MIT-2ebe6e" alt="license">
-  <img src="https://img.shields.io/badge/dependencies-none-e0762a" alt="no dependencies">
+  <img src="https://img.shields.io/badge/runtime-self--contained-e0762a" alt="self-contained">
 </p>
 
 <p align="center">
@@ -30,38 +30,44 @@
 
 ## Why AltSnip?
 
-I built this in an afternoon because WeChat froze while I was trying to grab a screenshot and I'd had enough. It turns out a genuinely nice snipping tool is about one C# file — so here it is, free for everyone.
+I built the first version in an afternoon because WeChat froze while I was trying to grab a screenshot and I'd had enough. It turned out a genuinely nice snipping tool isn't much code — so it grew into this: one hotkey, capture, annotate, copy or save, free for everyone, on every desktop OS.
 
 - ⚡ **Instant** — one global hotkey, `Alt + A`, from anywhere. No launch, no menus.
-- 🪶 **Featherweight** — a single ~50 KB executable. No installer, no runtime download, nothing to configure. It uses the .NET Framework that already ships with Windows.
-- 🎯 **Actually useful** — annotate, blur secrets, copy or save, all before you let go of the mouse.
+- 🎯 **Everything before you let go** — move/resize the box, annotate, blur secrets, then copy or save.
+- 📦 **Nothing to install** — a self-contained download per OS. No runtime, no dependencies, no configuration.
 
 ## Features
 
-- **One hotkey** — `Alt + A` freezes the screen and dims it; your selection stays crisp with a live pixel-size readout.
-- **Adjust the box** — drag inside to move it, grab any of the 8 handles to resize, or drag outside to start over. No more "close and redo".
+- **One hotkey** — `Alt + A` freezes and dims the screen; your selection stays crisp with a live pixel-size readout and a gold crosshair.
+- **Adjust the box** — drag inside to move it, grab any of the 8 handles to resize, or drag outside to start over.
 - **Annotate** — arrow, line, rectangle, text, and mosaic tools in a clean, borderless toolbar.
 - **Colors & thickness** — 7 preset colors and 3 line widths, one click away.
 - **Mosaic / blur** — drag over a phone number, face, or token to pixelate it before you share.
-- **Text with IME** — click, get a red caret, and type — Chinese and other input methods work, on a transparent background.
+- **Text with IME** — click and type, with a transparent background — Chinese and other input methods work.
 - **Copy or save** — ✓ (or `Enter`) copies to the clipboard; the save button exports a PNG.
-- **Cancel any way you like** — ✗, `Esc`, right-click, or just press `Alt + A` again.
-- **Multi-monitor** — works across every display, and the toolbar always stays on screen.
-- **Tray-resident** — double-click the tray icon to snip, right-click to quit.
+- **Cancel any way** — ✗, `Esc`, right-click, or press `Alt + A` again.
+- **Multi-monitor** — snips the screen under your cursor; the toolbar always stays on screen.
+- **Tray-resident** — click the tray icon to snip, right-click to quit.
 
-## Get started
+## Download
 
-1. Download `Snip.exe` from the [latest release](../../releases/latest).
-2. Double-click it — it tucks into your system tray.
-3. Press `Alt + A` and drag.
+Grab the file for your OS from the [latest release](../../releases/latest):
 
-Want it always ready? Put a shortcut to `Snip.exe` in your startup folder:
+| OS | Download | How to run |
+| --- | --- | --- |
+| **Windows** (10/11) | `AltSnip-Windows-x64.exe` | Double-click. It lives in the tray. Press `Alt + A`. |
+| **macOS** (Apple Silicon) | `AltSnip-macOS-arm64.zip` | Unzip → right-click the app ▸ **Open** (unsigned). Grant Screen Recording. |
+| **macOS** (Intel) | `AltSnip-macOS-x64.zip` | Same as above. |
+| **Linux** | `AltSnip-Linux-x64.AppImage` | `chmod +x` then run. Needs `grim`/`scrot` + `wl-copy`/`xclip`. |
 
-```
-Win + R  →  shell:startup  →  drop a shortcut to Snip.exe in there
-```
+> [!NOTE]
+> The Windows build is well tested. **macOS and Linux are still being validated on real hardware** — feedback very welcome. Global `Alt + A` works on Windows and X11 Linux; on macOS use the tray menu (system hotkey is coming).
 
-> Heads-up: WeChat's default screenshot shortcut is also `Alt + A`. AltSnip uses a low-level keyboard hook so it wins that key no matter who registered it first — no settings to change.
+> **Want a tiny Windows-only build?** The original single **~50 KB** `.exe` (WinForms, zero dependencies) lives at [v1.4.3](../../releases/tag/v1.4.3).
+
+Want it always ready? Add it to your startup / login items.
+
+> Heads-up: WeChat's default screenshot shortcut is also `Alt + A`. AltSnip uses a low-level keyboard hook so it wins that key — no settings to change.
 
 ## Shortcuts
 
@@ -75,30 +81,30 @@ Win + R  →  shell:startup  →  drop a shortcut to Snip.exe in there
 | `Ctrl + Z` / undo | Remove the last annotation |
 | `Esc` · right-click · ✗ | Cancel |
 
-## Platform
+## Two builds
 
-The stable build is **Windows** (Windows 8+) — the tiny single-file `.exe` above.
-
-A ground-up **cross-platform rewrite** (Avalonia) for **Windows / macOS / Linux** is
-in progress on the [`cross-platform`](../../tree/cross-platform) branch, with early
-binaries in the [`v2.0.0`](../../releases/tag/v2.0.0) release. It's
-feature-complete (select, annotate, mosaic, copy, save) and the Windows build is
-smoke-tested; macOS/Linux still need real-hardware testing. See
-[cross/README.md](cross/README.md).
+- **`cross/`** — the cross-platform app (Avalonia + SkiaSharp), shipped as the `v2.x` releases for Windows / macOS / Linux. This is the main project.
+- **`src/Snip.cs`** — the original Windows-only tool: a single ~50 KB WinForms `.exe` with zero dependencies (`v1.x` releases). Still great if you only need Windows and want the smallest possible download.
 
 ## Build from source
 
-No Visual Studio needed — Windows already ships the C# compiler.
+**Cross-platform** (needs the .NET 8 SDK):
+
+```bash
+dotnet run --project cross/AltSnip.Desktop.csproj
+```
+
+**Classic Windows** (no Visual Studio needed — Windows already ships the C# compiler):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File build.ps1
 ```
 
-The app icon is generated by `tools/IconGen.cs`; the demo animation by `tools/DemoGen.cs`.
+The app icon is generated by `tools/IconGen.cs`; the demo animation by `tools/DemoGen.cs`. CI in `.github/workflows/` builds and packages all three platforms.
 
 ## How it works
 
-On the hotkey, the whole virtual screen (all monitors) is copied into a bitmap. An overlay shows that frozen bitmap dimmed, with your selection drawn back in at full brightness; annotations are painted on top and burned into the final image on confirm. Because the background is frozen, nothing you do disturbs the underlying apps. The `Alt + A` hotkey is captured with a `WH_KEYBOARD_LL` hook — it only checks for that one combo and logs nothing.
+On the hotkey, the screen under the cursor is captured into a bitmap. A borderless overlay shows that frozen image dimmed, with your selection drawn back at full brightness; annotations are painted on top and burned into the final image on confirm. Because the background is frozen, nothing you do disturbs the apps underneath. Capture, the global hotkey, and the image clipboard are the only OS-specific pieces — everything else (UI, annotation, mosaic, save) is shared code.
 
 ## License
 

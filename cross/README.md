@@ -1,9 +1,9 @@
-# AltSnip — cross-platform (work in progress)
+# AltSnip — cross-platform (Windows / macOS / Linux)
 
-A ground-up rewrite of AltSnip on [Avalonia](https://avaloniaui.net/) so it can run on
-**Windows, macOS, and Linux** from one codebase. The original `../src/Snip.cs` is
-Windows-only (WinForms + Win32) and stays as the stable Windows build; this folder is
-the portable future.
+A ground-up rewrite of AltSnip on [Avalonia](https://avaloniaui.net/) so it runs on
+**Windows, macOS, and Linux** from one codebase — shipped as the `v2.x` releases.
+The original `../src/Snip.cs` is a Windows-only WinForms build kept around as an
+ultra-light option (`v1.x`).
 
 ## Why a rewrite (not just "another build")
 
@@ -32,14 +32,16 @@ stays clean.
   tray (Carbon hotkey TODO).
 - [x] **M3** — full annotation engine in SkiaSharp: arrow / line / rectangle /
   text (IME) / mosaic, color + thickness, move/resize handles, undo, copy, save PNG.
-- [x] **M4** — cross-published self-contained single-file binaries for all four
-  RIDs, attached to the [`v2.0.0`](../../releases/tag/v2.0.0) release.
-- [ ] **Next** — real-hardware testing on macOS & Linux; `.app`/AppImage packaging;
-  code signing; multi-monitor; macOS global hotkey.
+- [x] **M4** — packaged per OS (Windows `.exe`, macOS `.app` in a `.zip`, Linux
+  `.AppImage`) by `scripts/package.sh`, attached to the
+  [`v2.0.0`](../../releases/tag/v2.0.0) release.
+- [ ] **Next** — real-hardware testing on macOS & Linux; code signing; capture across
+  multiple monitors at once; macOS global hotkey (Carbon).
 
-**Verified:** compiles on all platforms (CI); the Windows build launches and runs
-cleanly (smoke-tested). **Not yet verified:** macOS & Linux runtime behaviour — help
-welcome. The maintainer's dev box has no .NET SDK, so CI is the source of truth.
+**Verified:** compiles on all platforms (CI); the **Windows build is fully working**
+(capture, annotate, mosaic, copy, save, hidden cursor + gold crosshair). **Not yet
+verified:** macOS & Linux runtime behaviour — help welcome. The maintainer's dev box
+has no .NET SDK, so CI is the source of truth.
 
 ## Build
 
