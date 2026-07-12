@@ -1,19 +1,23 @@
 using System;
+using Avalonia;
+using SkiaSharp;
 
 namespace AltSnip.Platform;
 
 /// <summary>
-/// 每个操作系统需要各自实现的原生能力：全局热键、屏幕捕获、图片剪贴板。
-/// UI 与标注逻辑是可移植的共享层，只通过这个接口访问系统。
+/// 每个操作系统各自实现的原生能力。UI 与标注逻辑是可移植的共享层，
+/// 只通过这个接口访问系统：截屏、图片剪贴板、全局热键。
 /// </summary>
 public interface IPlatformServices
 {
     string Name { get; }
 
-    // 里程碑 1 起逐个实现（当前为占位）：
-    // - 注册全局热键 Alt+A，回调触发截图
-    // - 捕获整个（虚拟）屏幕为位图
-    // - 把图片写入系统剪贴板
-    //
-    // 定义会随移植推进补上，先保持接口最小以让骨架编译通过。
+    /// <summary>捕获指定屏幕区域（屏幕像素坐标）为位图。</summary>
+    SKBitmap CaptureRegion(PixelRect region);
+
+    /// <summary>把图片写入系统剪贴板。</summary>
+    void CopyImageToClipboard(SKImage image);
+
+    /// <summary>注册全局热键 Alt+A；不支持的平台返回 null。返回值 Dispose 时注销。</summary>
+    IDisposable? RegisterHotkey(Action onAltA);
 }
