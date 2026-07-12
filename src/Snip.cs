@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
@@ -130,7 +132,7 @@ namespace SnipTool
             Application.SetCompatibleTextRenderingDefault(false);
             if (args.Length > 0 && args[0] == "--preview")
             {
-                int hover = args.Length > 2 ? int.Parse(args[2]) : 1;
+                int hover = args.Length > 2 ? int.Parse(args[2]) : 0;
                 OverlayForm.SavePreview(args.Length > 1 ? args[1] : "preview.png", hover);
                 return;
             }
@@ -138,28 +140,46 @@ namespace SnipTool
         }
     }
 
-    // 全屏选区遮罩：拖框 -> 出现 ✓ / ✗ 按钮 -> 打勾复制到剪贴板
+    // 标注类型
+    enum Tool { None, Arrow, Line, Rect }
+
+    // 一条标注
+    class Anno
+    {
+        public Tool Type;
+        public Point A;
+        public Point B;
+    }
+
+    // 全屏选区遮罩：拖框 -> 可选标注(箭头/直线/方框) -> 打勾复制到剪贴板
     public class OverlayForm : Form
     {
         Bitmap _full;          // 冻结的屏幕图
         Rectangle _vs;         // 虚拟屏幕范围（含负坐标偏移）
         Point _start;
         Rectangle _sel = Rectangle.Empty;
-        bool _dragging = false;
+        bool _dragging = false;   // 正在拖框选
         bool _hasSel = false;
 
-        Rectangle _okBtn = Rectangle.Empty;
-        Rectangle _cancelBtn = Rectangle.Empty;
-        int _hover = 0;   // 0 无 / 1 对勾 / 2 叉
-        const int BTN = 44;
+        Tool _tool = Tool.None;
+        readonly List<Anno> _annos = new List<Anno>();
+        Anno _drawing = null;     // 正在画的标注
+        bool _annotating = false;
+
+        // 工具条按钮：id 1箭头 2直线 3方框 4撤销 5取消 6确认
+        int _hover = 0;
+        Rectangle _bar = Rectangle.Empty;
+        readonly int[] _ids = { 1, 2, 3, 4, 5, 6 };
+        readonly Rectangle[] _rects = new Rectangle[6];
+        const int BTN = 42;
 
         // 暖琥珀 VI
-        static readonly Color C_CARD   = Color.FromArgb(0x1d, 0x15, 0x0b);
         static readonly Color C_GOLD   = Color.FromArgb(0xf4, 0xb7, 0x40);
-        static readonly Color C_ORANGE = Color.FromArgb(0xe0, 0x76, 0x2a);
         static readonly Color C_TEXT   = Color.FromArgb(0xf3, 0xec, 0xe0);
         static readonly Color C_TEXT2  = Color.FromArgb(0xb0, 0x9b, 0x80);
         static readonly Color C_DEEP   = Color.FromArgb(0x0e, 0x0a, 0x06);
+        static readonly Color C_ANNO   = Color.FromArgb(0xfa, 0x51, 0x51); // 标注红（最醒目，指哪打哪）
+        const float ANNO_W = 3f;
 
         public OverlayForm(Bitmap full, Rectangle vs)
         {
@@ -184,22 +204,46 @@ namespace SnipTool
 
         void OnKey(object s, KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.Escape) { this.Close(); }
-            else if (e.KeyCode == Keys.Enter && _hasSel) { Confirm(); }
+            if (e.KeyCode == Keys.Escape) this.Close();
+            else if (e.KeyCode == Keys.Enter && _hasSel) Confirm();
+            else if (e.Control && e.KeyCode == Keys.Z && _annos.Count > 0)
+            {
+                _annos.RemoveAt(_annos.Count - 1);
+                this.Invalidate();
+            }
+        }
+
+        int HitButton(Point p)
+        {
+            if (!_hasSel) return 0;
+            for (int i = 0; i < _rects.Length; i++)
+                if (_rects[i].Contains(p)) return _ids[i];
+            return 0;
         }
 
         void OnDown(object s, MouseEventArgs e)
         {
             if (e.Button != MouseButtons.Left) return;
-            // 已有选区时，点到按钮上则处理按钮
+
             if (_hasSel)
             {
-                if (_okBtn.Contains(e.Location)) { Confirm(); return; }
-                if (_cancelBtn.Contains(e.Location)) { this.Close(); return; }
+                int id = HitButton(e.Location);
+                if (id != 0) { HandleButton(id); return; }
+
+                // 选了标注工具且点在选区内 -> 开始画标注
+                if (_tool != Tool.None && _sel.Contains(e.Location))
+                {
+                    _annotating = true;
+                    _drawing = new Anno { Type = _tool, A = e.Location, B = e.Location };
+                    return;
+                }
+                // 否则重新框选（清掉旧标注）
             }
-            // 否则开始新的拖框
+
             _dragging = true;
             _hasSel = false;
+            _tool = Tool.None;
+            _annos.Clear();
             _hover = 0;
             this.Cursor = Cursors.Cross;
             _start = e.Location;
@@ -213,53 +257,73 @@ namespace SnipTool
             {
                 int x = Math.Min(_start.X, e.X);
                 int y = Math.Min(_start.Y, e.Y);
-                int w = Math.Abs(_start.X - e.X);
-                int h = Math.Abs(_start.Y - e.Y);
-                _sel = new Rectangle(x, y, w, h);
+                _sel = new Rectangle(x, y, Math.Abs(_start.X - e.X), Math.Abs(_start.Y - e.Y));
                 this.Invalidate();
                 return;
             }
-            // 选区已定：悬停在按钮上时切换成手型光标并高亮，否则保持十字
+            if (_annotating)
+            {
+                _drawing.B = e.Location;
+                this.Invalidate();
+                return;
+            }
             if (_hasSel)
             {
-                int h = _okBtn.Contains(e.Location) ? 1
-                      : _cancelBtn.Contains(e.Location) ? 2 : 0;
-                this.Cursor = (h == 0) ? Cursors.Cross : Cursors.Hand;
-                if (h != _hover) { _hover = h; this.Invalidate(); }
+                int id = HitButton(e.Location);
+                this.Cursor = (id != 0) ? Cursors.Hand : Cursors.Cross;
+                if (id != _hover) { _hover = id; this.Invalidate(); }
             }
         }
 
         void OnUp(object s, MouseEventArgs e)
         {
-            if (!_dragging) return;
-            _dragging = false;
-            if (_sel.Width >= 3 && _sel.Height >= 3)
+            if (_dragging)
             {
-                _hasSel = true;
-                LayoutButtons();
+                _dragging = false;
+                if (_sel.Width >= 3 && _sel.Height >= 3) { _hasSel = true; LayoutButtons(); }
+                else { _sel = Rectangle.Empty; _hasSel = false; }
+                this.Invalidate();
+                return;
             }
-            else
+            if (_annotating)
             {
-                _sel = Rectangle.Empty;
-                _hasSel = false;
+                _annotating = false;
+                int dx = _drawing.B.X - _drawing.A.X, dy = _drawing.B.Y - _drawing.A.Y;
+                if (dx * dx + dy * dy >= 16) _annos.Add(_drawing);   // 太短的忽略
+                _drawing = null;
+                this.Invalidate();
+            }
+        }
+
+        void HandleButton(int id)
+        {
+            switch (id)
+            {
+                case 1: _tool = (_tool == Tool.Arrow) ? Tool.None : Tool.Arrow; break;
+                case 2: _tool = (_tool == Tool.Line) ? Tool.None : Tool.Line; break;
+                case 3: _tool = (_tool == Tool.Rect) ? Tool.None : Tool.Rect; break;
+                case 4: if (_annos.Count > 0) _annos.RemoveAt(_annos.Count - 1); break;
+                case 5: this.Close(); return;
+                case 6: Confirm(); return;
             }
             this.Invalidate();
         }
 
         void LayoutButtons()
         {
-            // 胶囊工具条放选区右下角下方；空间不足则收进框内右下（叉在左、勾在右）
             const int GAP = 8;
-            int totalW = BTN * 2;
+            int totalW = BTN * _rects.Length;
             int bx = _sel.Right - totalW;
             int by = _sel.Bottom + GAP;
             if (bx < _sel.Left) bx = _sel.Left;
-            if (by + BTN > this.Height) by = _sel.Bottom - BTN - GAP; // 放框内
+            if (by + BTN > this.Height) by = _sel.Bottom - BTN - GAP; // 收进框内
             if (bx + totalW > this.Width) bx = this.Width - totalW - 2;
             if (bx < 0) bx = 2;
+            if (by < 0) by = 2;
 
-            _cancelBtn = new Rectangle(bx, by, BTN, BTN);
-            _okBtn = new Rectangle(bx + BTN, by, BTN, BTN);
+            _bar = new Rectangle(bx, by, totalW, BTN);
+            for (int i = 0; i < _rects.Length; i++)
+                _rects[i] = new Rectangle(bx + i * BTN, by, BTN, BTN);
         }
 
         void Confirm()
@@ -272,7 +336,13 @@ namespace SnipTool
                 using (Bitmap crop = new Bitmap(r.Width, r.Height))
                 {
                     using (Graphics g = Graphics.FromImage(crop))
+                    {
                         g.DrawImage(_full, new Rectangle(0, 0, r.Width, r.Height), r, GraphicsUnit.Pixel);
+                        // 把标注烧进图里（平移到裁剪坐标系）
+                        g.SmoothingMode = SmoothingMode.AntiAlias;
+                        g.TranslateTransform(-r.X, -r.Y);
+                        foreach (var a in _annos) DrawAnno(g, a);
+                    }
                     Clipboard.SetImage(crop);
                 }
             }
@@ -283,6 +353,8 @@ namespace SnipTool
             this.Close();
         }
 
+        // ================= 绘制 =================
+
         protected override void OnPaint(PaintEventArgs e)
         {
             Render(e.Graphics);
@@ -290,105 +362,188 @@ namespace SnipTool
 
         public void Render(Graphics g)
         {
-            // 画冻结屏幕
             g.DrawImageUnscaled(_full, 0, 0);
-            // 半透明暗色遮罩铺满
             using (var dim = new SolidBrush(Color.FromArgb(120, 0, 0, 0)))
                 g.FillRectangle(dim, this.ClientRectangle);
 
             if (_sel.Width > 0 && _sel.Height > 0)
             {
-                // 选区内还原成清晰原图
+                // 选区内还原清晰原图
                 g.DrawImage(_full, _sel, _sel, GraphicsUnit.Pixel);
-                // 边框（暖金）
+                // 极简细边框（暖金 1px）
                 g.SmoothingMode = SmoothingMode.None;
-                using (var pen = new Pen(C_GOLD, 1.6f))
-                    g.DrawRectangle(pen, _sel);
+                using (var pen = new Pen(C_GOLD, 1f))
+                    g.DrawRectangle(pen, _sel.X, _sel.Y, _sel.Width - 1, _sel.Height - 1);
                 g.SmoothingMode = SmoothingMode.AntiAlias;
-                // 尺寸标注（暖墨底 + 金字）
-                string info = _sel.Width + " × " + _sel.Height;
-                using (var f = new Font("Segoe UI", 9f, FontStyle.Regular))
-                using (var bg = new SolidBrush(Color.FromArgb(235, C_DEEP)))
-                using (var fg = new SolidBrush(C_GOLD))
+
+                // 标注（裁进选区内绘制）
+                var oldClip = g.Clip;
+                g.SetClip(_sel);
+                foreach (var a in _annos) DrawAnno(g, a);
+                if (_annotating && _drawing != null) DrawAnno(g, _drawing);
+                g.Clip = oldClip;
+
+                // 尺寸仅在拖动时显示（精简）
+                if (_dragging)
                 {
-                    SizeF sz = g.MeasureString(info, f);
-                    float tx = _sel.Left;
-                    float ty = _sel.Top - sz.Height - 6;
-                    if (ty < 0) ty = _sel.Top + 4;
-                    using (var p = Rounded(new Rectangle((int)tx, (int)ty, (int)sz.Width + 12, (int)sz.Height + 4), 4))
-                        g.FillPath(bg, p);
-                    g.DrawString(info, f, fg, tx + 6, ty + 2);
+                    string info = _sel.Width + " × " + _sel.Height;
+                    using (var f = new Font("Segoe UI", 9f))
+                    using (var bg = new SolidBrush(Color.FromArgb(210, C_DEEP)))
+                    using (var fg = new SolidBrush(C_GOLD))
+                    {
+                        SizeF sz = g.MeasureString(info, f);
+                        float tx = _sel.Left, ty = _sel.Top - sz.Height - 5;
+                        if (ty < 2) ty = _sel.Top + 4;
+                        g.FillRectangle(bg, tx, ty, sz.Width + 10, sz.Height + 2);
+                        g.DrawString(info, f, fg, tx + 5, ty + 1);
+                    }
                 }
 
-                if (_hasSel)
-                    DrawButtons(g);
+                if (_hasSel) DrawToolbar(g);
             }
             else if (!_dragging)
             {
-                // 提示语（暖墨底 + 暖白字，金色圆点点睛）
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 string tip = "拖动框选区域        Enter 复制        Esc 取消";
                 using (var f = new Font("Microsoft YaHei", 11f))
-                using (var bg = new SolidBrush(Color.FromArgb(210, C_DEEP)))
+                using (var bg = new SolidBrush(Color.FromArgb(200, C_DEEP)))
                 using (var fg = new SolidBrush(C_TEXT))
                 {
                     SizeF sz = g.MeasureString(tip, f);
-                    float tx = (this.Width - sz.Width) / 2;
-                    float ty = 44;
+                    float tx = (this.Width - sz.Width) / 2, ty = 44;
                     using (var p = Rounded(new Rectangle((int)(tx - 18), (int)(ty - 9), (int)sz.Width + 36, (int)sz.Height + 18), 10))
                         g.FillPath(bg, p);
-                    // 暖金点睛描边
-                    using (var pen = new Pen(Color.FromArgb(90, C_ORANGE), 1f))
-                    using (var p = Rounded(new Rectangle((int)(tx - 18), (int)(ty - 9), (int)sz.Width + 35, (int)sz.Height + 17), 10))
-                        g.DrawPath(pen, p);
                     g.DrawString(tip, f, fg, tx, ty);
                 }
             }
         }
 
-        // 微信风悬浮工具条：暖墨胶囊底 + 细描边 + 细笔画图标，悬停高亮
-        void DrawButtons(Graphics g)
+        // 极简工具条：无边框，半透明暖墨底 + 细笔画图标
+        void DrawToolbar(Graphics g)
         {
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            Rectangle bar = Rectangle.Union(_cancelBtn, _okBtn);
-
-            // 投影
-            using (var sh = new SolidBrush(Color.FromArgb(90, 0, 0, 0)))
-            using (var p = Rounded(new Rectangle(bar.X, bar.Y + 3, bar.Width, bar.Height), 11))
+            // 柔和投影
+            using (var sh = new SolidBrush(Color.FromArgb(70, 0, 0, 0)))
+            using (var p = Rounded(new Rectangle(_bar.X, _bar.Y + 3, _bar.Width, _bar.Height), 10))
                 g.FillPath(sh, p);
-            // 胶囊底（暖墨面板）
-            using (var bg = new SolidBrush(C_CARD))
-            using (var p = Rounded(bar, 11))
+            // 底板（无描边）
+            using (var bg = new SolidBrush(Color.FromArgb(205, C_DEEP)))
+            using (var p = Rounded(_bar, 10))
                 g.FillPath(bg, p);
-            // 悬停高亮（金=确认 / 暖白=取消）
-            if (_hover == 1) FillHover(g, _okBtn, C_GOLD);
-            else if (_hover == 2) FillHover(g, _cancelBtn, C_TEXT);
-            // 橙色结构描边
-            using (var pen = new Pen(Color.FromArgb(120, C_ORANGE), 1f))
-            using (var p = Rounded(new Rectangle(bar.X, bar.Y, bar.Width - 1, bar.Height - 1), 11))
-                g.DrawPath(pen, p);
-            // 中缝分隔线
-            using (var pen = new Pen(Color.FromArgb(70, C_TEXT2), 1f))
-                g.DrawLine(pen, bar.X + BTN, bar.Y + 11, bar.X + BTN, bar.Bottom - 11);
 
-            DrawCross(g, _cancelBtn, _hover == 2 ? C_TEXT : C_TEXT2);
-            DrawCheck(g, _okBtn, C_GOLD);
+            for (int i = 0; i < _rects.Length; i++)
+            {
+                int id = _ids[i];
+                Rectangle c = _rects[i];
+                bool active = (id == 1 && _tool == Tool.Arrow) || (id == 2 && _tool == Tool.Line) || (id == 3 && _tool == Tool.Rect);
+                bool hover = (_hover == id);
+                if (active) Chip(g, c, C_GOLD, 46);
+                else if (hover) Chip(g, c, C_TEXT, 26);
+
+                Color ic = active ? C_GOLD : (hover ? C_TEXT : C_TEXT2);
+                switch (id)
+                {
+                    case 1: DrawArrowIcon(g, c, ic); break;
+                    case 2: DrawLineIcon(g, c, ic); break;
+                    case 3: DrawRectIcon(g, c, ic); break;
+                    case 4: DrawUndoIcon(g, c, _annos.Count == 0 ? Color.FromArgb(90, C_TEXT2) : ic); break;
+                    case 5: DrawCross(g, c, hover ? C_TEXT : C_TEXT2); break;
+                    case 6: DrawCheck(g, c, C_GOLD); break;
+                }
+            }
         }
 
-        void FillHover(Graphics g, Rectangle cell, Color c)
+        void Chip(Graphics g, Rectangle cell, Color c, int alpha)
         {
-            Rectangle r = Rectangle.Inflate(cell, -5, -5);
-            using (var b = new SolidBrush(Color.FromArgb(38, c)))
+            Rectangle r = Rectangle.Inflate(cell, -4, -4);
+            using (var b = new SolidBrush(Color.FromArgb(alpha, c)))
             using (var p = Rounded(r, 8))
                 g.FillPath(b, p);
         }
 
+        // ---- 标注绘制 ----
+        void DrawAnno(Graphics g, Anno a)
+        {
+            using (var pen = new Pen(C_ANNO, ANNO_W))
+            {
+                pen.StartCap = LineCap.Round; pen.EndCap = LineCap.Round; pen.LineJoin = LineJoin.Round;
+                if (a.Type == Tool.Rect)
+                {
+                    int x = Math.Min(a.A.X, a.B.X), y = Math.Min(a.A.Y, a.B.Y);
+                    g.DrawRectangle(pen, x, y, Math.Abs(a.A.X - a.B.X), Math.Abs(a.A.Y - a.B.Y));
+                }
+                else if (a.Type == Tool.Line)
+                {
+                    g.DrawLine(pen, a.A, a.B);
+                }
+                else if (a.Type == Tool.Arrow)
+                {
+                    g.DrawLine(pen, a.A, a.B);
+                    double ang = Math.Atan2(a.B.Y - a.A.Y, a.B.X - a.A.X);
+                    float len = 10 + ANNO_W * 2.2f;
+                    double a1 = ang + Math.PI - 0.5, a2 = ang + Math.PI + 0.5;
+                    g.DrawLine(pen, a.B, new PointF(a.B.X + (float)(Math.Cos(a1) * len), a.B.Y + (float)(Math.Sin(a1) * len)));
+                    g.DrawLine(pen, a.B, new PointF(a.B.X + (float)(Math.Cos(a2) * len), a.B.Y + (float)(Math.Sin(a2) * len)));
+                }
+            }
+        }
+
+        // ---- 图标 ----
+        static Pen IconPen(Color c, float w)
+        {
+            var pen = new Pen(c, w);
+            pen.StartCap = LineCap.Round; pen.EndCap = LineCap.Round; pen.LineJoin = LineJoin.Round;
+            return pen;
+        }
+
+        void DrawArrowIcon(Graphics g, Rectangle c, Color col)
+        {
+            using (var pen = IconPen(col, 2.2f))
+            {
+                var t = new PointF(c.Left + 13, c.Bottom - 13);
+                var h = new PointF(c.Right - 13, c.Top + 13);
+                g.DrawLine(pen, t, h);
+                double ang = Math.Atan2(h.Y - t.Y, h.X - t.X);
+                float len = 7f;
+                double a1 = ang + Math.PI - 0.5, a2 = ang + Math.PI + 0.5;
+                g.DrawLine(pen, h, new PointF(h.X + (float)(Math.Cos(a1) * len), h.Y + (float)(Math.Sin(a1) * len)));
+                g.DrawLine(pen, h, new PointF(h.X + (float)(Math.Cos(a2) * len), h.Y + (float)(Math.Sin(a2) * len)));
+            }
+        }
+
+        void DrawLineIcon(Graphics g, Rectangle c, Color col)
+        {
+            using (var pen = IconPen(col, 2.2f))
+                g.DrawLine(pen, c.Left + 13, c.Bottom - 13, c.Right - 13, c.Top + 13);
+        }
+
+        void DrawRectIcon(Graphics g, Rectangle c, Color col)
+        {
+            using (var pen = IconPen(col, 2.2f))
+            using (var p = Rounded(new Rectangle(c.Left + 12, c.Top + 13, c.Width - 24, c.Height - 26), 3))
+                g.DrawPath(pen, p);
+        }
+
+        void DrawUndoIcon(Graphics g, Rectangle c, Color col)
+        {
+            using (var pen = IconPen(col, 2.2f))
+            {
+                var box = new RectangleF(c.Left + 13, c.Top + 14, c.Width - 26, c.Height - 26);
+                g.DrawArc(pen, box.X, box.Y, box.Width, box.Height, 30, 280);
+                // 左上开口处画个小箭头（逆时针回退）
+                float cx = box.X + box.Width / 2f, cy = box.Y + box.Height / 2f;
+                double ang = 30 * Math.PI / 180;
+                var tip = new PointF(cx + (float)(Math.Cos(ang) * box.Width / 2f), cy + (float)(Math.Sin(ang) * box.Height / 2f));
+                g.DrawLine(pen, tip, new PointF(tip.X - 5, tip.Y - 2));
+                g.DrawLine(pen, tip, new PointF(tip.X + 1, tip.Y - 6));
+            }
+        }
+
         void DrawCross(Graphics g, Rectangle c, Color col)
         {
-            using (var pen = new Pen(col, 2.4f))
+            using (var pen = IconPen(col, 2.3f))
             {
-                pen.StartCap = LineCap.Round; pen.EndCap = LineCap.Round;
-                int p = 16;
+                int p = 15;
                 g.DrawLine(pen, c.Left + p, c.Top + p, c.Right - p, c.Bottom - p);
                 g.DrawLine(pen, c.Right - p, c.Top + p, c.Left + p, c.Bottom - p);
             }
@@ -396,12 +551,11 @@ namespace SnipTool
 
         void DrawCheck(Graphics g, Rectangle c, Color col)
         {
-            using (var pen = new Pen(col, 2.6f))
+            using (var pen = IconPen(col, 2.6f))
             {
-                pen.StartCap = LineCap.Round; pen.EndCap = LineCap.Round; pen.LineJoin = LineJoin.Round;
-                var p1 = new PointF(c.Left + 14f, c.Top + 23f);
-                var p2 = new PointF(c.Left + 20f, c.Top + 29f);
-                var p3 = new PointF(c.Left + 31f, c.Top + 16f);
+                var p1 = new PointF(c.Left + 13f, c.Top + 22f);
+                var p2 = new PointF(c.Left + 18f, c.Top + 27f);
+                var p3 = new PointF(c.Left + 29f, c.Top + 15f);
                 g.DrawLines(pen, new[] { p1, p2, p3 });
             }
         }
@@ -418,15 +572,14 @@ namespace SnipTool
             return path;
         }
 
-        // 隐藏开发用：把真实绘制渲染成 PNG，便于核对视觉。用法 Snip.exe --preview out.png
+        // 隐藏开发用：把真实绘制渲染成 PNG，便于核对视觉。用法 Snip.exe --preview out.png [hoverId]
         internal static void SavePreview(string path, int hover)
         {
             int W = 560, H = 380;
             var bg = new Bitmap(W, H);
             using (var g = Graphics.FromImage(bg))
             {
-                using (var br = new System.Drawing.Drawing2D.LinearGradientBrush(
-                    new Rectangle(0, 0, W, H), Color.FromArgb(48, 76, 120), Color.FromArgb(18, 26, 44), 45f))
+                using (var br = new LinearGradientBrush(new Rectangle(0, 0, W, H), Color.FromArgb(48, 76, 120), Color.FromArgb(18, 26, 44), 45f))
                     g.FillRectangle(br, 0, 0, W, H);
                 using (var b = new SolidBrush(Color.FromArgb(238, 238, 240)))
                     g.FillRectangle(b, 70, 70, 230, 130);
@@ -435,14 +588,17 @@ namespace SnipTool
             }
             var f = new OverlayForm(bg, new Rectangle(0, 0, W, H));
             f.Bounds = new Rectangle(0, 0, W, H);
-            f._sel = new Rectangle(120, 95, 300, 180);
+            f._sel = new Rectangle(120, 95, 300, 175);
             f._hasSel = true;
+            f._tool = Tool.Arrow;
+            f._annos.Add(new Anno { Type = Tool.Arrow, A = new Point(380, 250), B = new Point(230, 150) });
+            f._annos.Add(new Anno { Type = Tool.Rect, A = new Point(150, 120), B = new Point(250, 180) });
             f.LayoutButtons();
             f._hover = hover;
             using (var outBmp = new Bitmap(W, H))
             {
                 using (var g = Graphics.FromImage(outBmp)) f.Render(g);
-                outBmp.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+                outBmp.Save(path, ImageFormat.Png);
             }
             f.Dispose();
         }
