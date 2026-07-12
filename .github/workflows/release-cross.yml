@@ -38,9 +38,9 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: cross-preview
+          tag_name: v2.0.0-preview.1
           target_commitish: cross-platform
-          name: AltSnip — cross-platform preview
+          name: AltSnip v2.0.0-preview — cross-platform (Windows / macOS / Linux)
           prerelease: true
           files: dist/*
           body: |
