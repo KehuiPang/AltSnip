@@ -59,6 +59,8 @@ public sealed class LinuxServices : IPlatformServices
         catch { return null; }
     }
 
+    public PixelPoint? CursorPosition() => null;
+
     private sealed class X11Hotkey : IDisposable
     {
         const int GrabModeAsync = 1, KeyPress = 2;
