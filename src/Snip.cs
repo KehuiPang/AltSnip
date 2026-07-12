@@ -141,7 +141,7 @@ namespace SnipTool
     }
 
     // 标注类型
-    enum Tool { None, Arrow, Line, Rect }
+    enum Tool { None, Arrow, Line, Rect, Text }
 
     // 一条标注
     class Anno
@@ -149,6 +149,7 @@ namespace SnipTool
         public Tool Type;
         public Point A;
         public Point B;
+        public string Text;
     }
 
     // 全屏选区遮罩：拖框 -> 可选标注(箭头/直线/方框) -> 打勾复制到剪贴板
@@ -166,12 +167,15 @@ namespace SnipTool
         Anno _drawing = null;     // 正在画的标注
         bool _annotating = false;
 
-        // 工具条按钮：id 1箭头 2直线 3方框 4撤销 5取消 6确认
+        // 工具条按钮：id 1箭头 2直线 3方框 7文字 4撤销 5取消 6确认
         int _hover = 0;
         Rectangle _bar = Rectangle.Empty;
-        readonly int[] _ids = { 1, 2, 3, 4, 5, 6 };
-        readonly Rectangle[] _rects = new Rectangle[6];
+        readonly int[] _ids = { 1, 2, 3, 7, 4, 5, 6 };
+        readonly Rectangle[] _rects = new Rectangle[7];
         const int BTN = 42;
+
+        TextBox _tb = null;   // 文字标注输入框（真控件，支持中文输入法）
+        static readonly Font AnnoFont = new Font("Microsoft YaHei", 13.5f);
 
         // 暖琥珀 VI
         static readonly Color C_GOLD   = Color.FromArgb(0xf4, 0xb7, 0x40);
@@ -204,6 +208,13 @@ namespace SnipTool
 
         void OnKey(object s, KeyEventArgs e)
         {
+            // 正在打字：Enter 提交、Esc 取消这段文字，其它键交给输入框
+            if (_tb != null)
+            {
+                if (e.KeyCode == Keys.Escape) { CancelText(); e.SuppressKeyPress = true; }
+                else if (e.KeyCode == Keys.Enter) { CommitText(); e.SuppressKeyPress = true; }
+                return;
+            }
             if (e.KeyCode == Keys.Escape) this.Close();
             else if (e.KeyCode == Keys.Enter && _hasSel) Confirm();
             else if (e.Control && e.KeyCode == Keys.Z && _annos.Count > 0)
@@ -225,13 +236,22 @@ namespace SnipTool
         {
             if (e.Button != MouseButtons.Left) return;
 
+            // 点击别处先把正在输入的文字落定
+            if (_tb != null) CommitText();
+
             if (_hasSel)
             {
                 int id = HitButton(e.Location);
                 if (id != 0) { HandleButton(id); return; }
 
-                // 选了标注工具且点在选区内 -> 开始画标注
-                if (_tool != Tool.None && _sel.Contains(e.Location))
+                // 文字工具：在点击处开一个输入框
+                if (_tool == Tool.Text && _sel.Contains(e.Location))
+                {
+                    BeginText(e.Location);
+                    return;
+                }
+                // 其它标注工具：拖动画形状
+                if (_tool != Tool.None && _tool != Tool.Text && _sel.Contains(e.Location))
                 {
                     _annotating = true;
                     _drawing = new Anno { Type = _tool, A = e.Location, B = e.Location };
@@ -270,7 +290,9 @@ namespace SnipTool
             if (_hasSel)
             {
                 int id = HitButton(e.Location);
-                this.Cursor = (id != 0) ? Cursors.Hand : Cursors.Cross;
+                if (id != 0) this.Cursor = Cursors.Hand;
+                else if (_tool == Tool.Text && _sel.Contains(e.Location)) this.Cursor = Cursors.IBeam;
+                else this.Cursor = Cursors.Cross;
                 if (id != _hover) { _hover = id; this.Invalidate(); }
             }
         }
@@ -302,6 +324,7 @@ namespace SnipTool
                 case 1: _tool = (_tool == Tool.Arrow) ? Tool.None : Tool.Arrow; break;
                 case 2: _tool = (_tool == Tool.Line) ? Tool.None : Tool.Line; break;
                 case 3: _tool = (_tool == Tool.Rect) ? Tool.None : Tool.Rect; break;
+                case 7: _tool = (_tool == Tool.Text) ? Tool.None : Tool.Text; break;
                 case 4: if (_annos.Count > 0) _annos.RemoveAt(_annos.Count - 1); break;
                 case 5: this.Close(); return;
                 case 6: Confirm(); return;
@@ -326,8 +349,50 @@ namespace SnipTool
                 _rects[i] = new Rectangle(bx + i * BTN, by, BTN, BTN);
         }
 
+        // ---- 文字标注输入 ----
+        void BeginText(Point p)
+        {
+            CommitText();
+            _tb = new TextBox();
+            _tb.BorderStyle = BorderStyle.None;
+            _tb.Multiline = false;
+            _tb.BackColor = Color.FromArgb(28, 20, 12);
+            _tb.ForeColor = C_ANNO;
+            _tb.Font = AnnoFont;
+            _tb.Location = new Point(p.X, p.Y);
+            _tb.Width = Math.Min(280, Math.Max(60, _sel.Right - p.X - 4));
+            this.Controls.Add(_tb);
+            _tb.Focus();
+            this.Invalidate();
+        }
+
+        void CommitText()
+        {
+            if (_tb == null) return;
+            var tb = _tb; _tb = null;               // 先置空，避免重入
+            string txt = tb.Text;
+            Point pos = tb.Location;
+            this.Controls.Remove(tb);
+            tb.Dispose();
+            if (!string.IsNullOrEmpty(txt) && txt.Trim().Length > 0)
+                _annos.Add(new Anno { Type = Tool.Text, A = pos, Text = txt });
+            this.Focus();
+            this.Invalidate();
+        }
+
+        void CancelText()
+        {
+            if (_tb == null) return;
+            var tb = _tb; _tb = null;
+            this.Controls.Remove(tb);
+            tb.Dispose();
+            this.Focus();
+            this.Invalidate();
+        }
+
         void Confirm()
         {
+            CommitText();   // 落定未回车的文字
             try
             {
                 Rectangle r = _sel;
@@ -435,7 +500,8 @@ namespace SnipTool
             {
                 int id = _ids[i];
                 Rectangle c = _rects[i];
-                bool active = (id == 1 && _tool == Tool.Arrow) || (id == 2 && _tool == Tool.Line) || (id == 3 && _tool == Tool.Rect);
+                bool active = (id == 1 && _tool == Tool.Arrow) || (id == 2 && _tool == Tool.Line)
+                            || (id == 3 && _tool == Tool.Rect) || (id == 7 && _tool == Tool.Text);
                 bool hover = (_hover == id);
                 if (active) Chip(g, c, C_GOLD, 46);
                 else if (hover) Chip(g, c, C_TEXT, 26);
@@ -446,6 +512,7 @@ namespace SnipTool
                     case 1: DrawArrowIcon(g, c, ic); break;
                     case 2: DrawLineIcon(g, c, ic); break;
                     case 3: DrawRectIcon(g, c, ic); break;
+                    case 7: DrawTextIcon(g, c, ic); break;
                     case 4: DrawUndoIcon(g, c, _annos.Count == 0 ? Color.FromArgb(90, C_TEXT2) : ic); break;
                     case 5: DrawCross(g, c, hover ? C_TEXT : C_TEXT2); break;
                     case 6: DrawCheck(g, c, C_GOLD); break;
@@ -486,6 +553,14 @@ namespace SnipTool
                     g.DrawLine(pen, a.B, new PointF(a.B.X + (float)(Math.Cos(a2) * len), a.B.Y + (float)(Math.Sin(a2) * len)));
                 }
             }
+            if (a.Type == Tool.Text && !string.IsNullOrEmpty(a.Text))
+            {
+                // 深色描影 + 红字，任意背景都清晰
+                using (var sh = new SolidBrush(Color.FromArgb(170, 0, 0, 0)))
+                    g.DrawString(a.Text, AnnoFont, sh, a.A.X + 1, a.A.Y + 1);
+                using (var br = new SolidBrush(C_ANNO))
+                    g.DrawString(a.Text, AnnoFont, br, a.A.X, a.A.Y);
+            }
         }
 
         // ---- 图标 ----
@@ -522,6 +597,16 @@ namespace SnipTool
             using (var pen = IconPen(col, 2.2f))
             using (var p = Rounded(new Rectangle(c.Left + 12, c.Top + 13, c.Width - 24, c.Height - 26), 3))
                 g.DrawPath(pen, p);
+        }
+
+        void DrawTextIcon(Graphics g, Rectangle c, Color col)
+        {
+            using (var pen = IconPen(col, 2.2f))
+            {
+                float cx = c.Left + c.Width / 2f;
+                g.DrawLine(pen, c.Left + 12, c.Top + 14, c.Right - 12, c.Top + 14); // 顶横
+                g.DrawLine(pen, cx, c.Top + 14, cx, c.Bottom - 13);                 // 竖
+            }
         }
 
         void DrawUndoIcon(Graphics g, Rectangle c, Color col)
@@ -590,9 +675,10 @@ namespace SnipTool
             f.Bounds = new Rectangle(0, 0, W, H);
             f._sel = new Rectangle(120, 95, 300, 175);
             f._hasSel = true;
-            f._tool = Tool.Arrow;
-            f._annos.Add(new Anno { Type = Tool.Arrow, A = new Point(380, 250), B = new Point(230, 150) });
-            f._annos.Add(new Anno { Type = Tool.Rect, A = new Point(150, 120), B = new Point(250, 180) });
+            f._tool = Tool.Text;
+            f._annos.Add(new Anno { Type = Tool.Arrow, A = new Point(390, 250), B = new Point(250, 160) });
+            f._annos.Add(new Anno { Type = Tool.Rect, A = new Point(150, 120), B = new Point(240, 175) });
+            f._annos.Add(new Anno { Type = Tool.Text, A = new Point(300, 255), Text = "看这里" });
             f.LayoutButtons();
             f._hover = hover;
             using (var outBmp = new Bitmap(W, H))
