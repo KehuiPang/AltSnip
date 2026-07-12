@@ -36,7 +36,8 @@ public sealed class OverlayControl : Control
     /// <summary>承载文字输入框的图层（由窗口提供，绝对定位）。</summary>
     public Canvas? TextLayer { get; set; }
 
-    WriteableBitmap? _wb;                 // 复用的显示位图（物理像素尺寸=截图尺寸）
+    readonly SKBitmap _frame;             // 物理像素帧缓冲（尺寸=截图，只建一次）
+    Bitmap? _ava;                         // 每次重绘换一张 Avalonia 位图（旧的立即释放）
     double _scale = 1;
     double _dipW, _dipH;
     double DipW => _dipW;
@@ -104,8 +105,7 @@ public sealed class OverlayControl : Control
         _src = src;
         _onClose = onClose;
         _onCopy = onCopy;
-        _wb = new WriteableBitmap(new PixelSize(src.Width, src.Height), new Vector(96, 96),
-            Avalonia.Platform.PixelFormat.Bgra8888, Avalonia.Platform.AlphaFormat.Premul);
+        _frame = new SKBitmap(src.Width, src.Height, SKColorType.Bgra8888, SKAlphaType.Premul);
         Focusable = true;
         Cursor = CurHidden;   // 隐藏系统灰十字，改用自绘金色准星
     }
@@ -144,24 +144,23 @@ public sealed class OverlayControl : Control
 
     void Repaint()
     {
-        if (_wb == null || _dipW <= 0) return;
-        using (var fb = _wb.Lock())
-        using (var surf = SKSurface.Create(
-            new SKImageInfo(_src.Width, _src.Height, SKColorType.Bgra8888, SKAlphaType.Premul),
-            fb.Address, fb.RowBytes))
+        if (_dipW <= 0) return;
+        using (var c = new SKCanvas(_frame))
         {
-            var c = surf.Canvas;
             c.Clear(SKColors.Black);
             c.Scale((float)_scale);
             DrawScene(c);
         }
+        var old = _ava;
+        _ava = new Bitmap(Avalonia.Platform.PixelFormat.Bgra8888, Avalonia.Platform.AlphaFormat.Premul,
+            _frame.GetPixels(), new PixelSize(_frame.Width, _frame.Height), new Vector(96, 96), _frame.RowBytes);
+        old?.Dispose();   // 释放上一张，杜绝泄漏
         InvalidateVisual();
     }
 
     public override void Render(DrawingContext ctx)
     {
-        Log.W($"render wb={_wb != null} dip={_dipW}x{_dipH} bounds={Bounds}");
-        if (_wb != null) ctx.DrawImage(_wb, new Rect(0, 0, _dipW, _dipH));
+        if (_ava != null) ctx.DrawImage(_ava, new Rect(0, 0, _dipW, _dipH));
     }
 
     // ---------- 场景绘制（DIP 坐标）----------
