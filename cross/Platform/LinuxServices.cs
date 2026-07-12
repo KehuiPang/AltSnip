@@ -1,6 +1,9 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
+using System.Threading;
 using Avalonia;
+using Avalonia.Threading;
 using SkiaSharp;
 
 namespace AltSnip.Platform;
@@ -49,5 +52,68 @@ public sealed class LinuxServices : IPlatformServices
         if (Proc.Exists("xclip")) { Proc.Run("xclip", "-selection", "clipboard", "-t", "image/png", "-i", tmp); return; }
     }
 
-    public IDisposable? RegisterHotkey(Action onAltA) => null; // M2: X11 XGrabKey
+    // 全局热键：X11 XGrabKey（best-effort，X11/XWayland 有效；失败则返回 null 走托盘）
+    public IDisposable? RegisterHotkey(Action onAltA)
+    {
+        try { return new X11Hotkey(onAltA); }
+        catch { return null; }
+    }
+
+    private sealed class X11Hotkey : IDisposable
+    {
+        const int GrabModeAsync = 1, KeyPress = 2;
+        const uint Mod1 = 0x08, Lock = 0x02, Mod2 = 0x10;
+        readonly IntPtr _display;
+        readonly IntPtr _root;
+        readonly int _keycode;
+        readonly Thread _thread;
+        readonly Action _onAltA;
+        volatile bool _stop;
+
+        public X11Hotkey(Action onAltA)
+        {
+            _onAltA = onAltA;
+            _display = XOpenDisplay(null);
+            if (_display == IntPtr.Zero) throw new InvalidOperationException("no X display");
+            _root = XDefaultRootWindow(_display);
+            _keycode = XKeysymToKeycode(_display, (IntPtr)0x61); // XK_a
+            foreach (uint extra in new uint[] { 0, Lock, Mod2, Lock | Mod2 })
+                XGrabKey(_display, _keycode, Mod1 | extra, _root, true, GrabModeAsync, GrabModeAsync);
+            _thread = new Thread(Loop) { IsBackground = true, Name = "AltSnip-x11-hotkey" };
+            _thread.Start();
+        }
+
+        void Loop()
+        {
+            var buf = new byte[192]; // XEvent 联合体
+            while (!_stop)
+            {
+                if (XPending(_display) > 0)
+                {
+                    XNextEvent(_display, buf);
+                    if (BitConverter.ToInt32(buf, 0) == KeyPress)
+                        Dispatcher.UIThread.Post(_onAltA);
+                }
+                else Thread.Sleep(20);
+            }
+            try
+            {
+                foreach (uint extra in new uint[] { 0, Lock, Mod2, Lock | Mod2 })
+                    XUngrabKey(_display, _keycode, Mod1 | extra, _root);
+                XCloseDisplay(_display);
+            }
+            catch { }
+        }
+
+        public void Dispose() { _stop = true; }
+
+        [DllImport("libX11.so.6")] static extern IntPtr XOpenDisplay(string? d);
+        [DllImport("libX11.so.6")] static extern int XCloseDisplay(IntPtr d);
+        [DllImport("libX11.so.6")] static extern IntPtr XDefaultRootWindow(IntPtr d);
+        [DllImport("libX11.so.6")] static extern int XKeysymToKeycode(IntPtr d, IntPtr keysym);
+        [DllImport("libX11.so.6")] static extern int XGrabKey(IntPtr d, int keycode, uint mods, IntPtr win, bool owner, int pMode, int kMode);
+        [DllImport("libX11.so.6")] static extern int XUngrabKey(IntPtr d, int keycode, uint mods, IntPtr win);
+        [DllImport("libX11.so.6")] static extern int XNextEvent(IntPtr d, byte[] ev);
+        [DllImport("libX11.so.6")] static extern int XPending(IntPtr d);
+    }
 }
