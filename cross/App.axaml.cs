@@ -36,6 +36,12 @@ public partial class App : Application
 
             SetupTray();
             try { _hotkey = PlatformServices.Current.RegisterHotkey(Capture); } catch { }
+
+            // 隐藏自测：启动即触发一次截图，便于开发时验证覆盖层
+            foreach (var a in Environment.GetCommandLineArgs())
+                if (a == "--test-capture")
+                    Avalonia.Threading.Dispatcher.UIThread.Post(Capture,
+                        Avalonia.Threading.DispatcherPriority.Background);
         }
 
         base.OnFrameworkInitializationCompleted();
@@ -81,7 +87,7 @@ public partial class App : Application
 
             var bounds = screen.Bounds;
             var shot = PlatformServices.Current.CaptureRegion(bounds);
-            var win = new OverlayWindow(shot, bounds, screen.Scaling);
+            var win = new OverlayWindow(shot, bounds);
             win.Closed += (_, _) => _capturing = false;
             win.Show();
             win.Activate();
