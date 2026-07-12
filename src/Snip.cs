@@ -160,7 +160,7 @@ namespace SnipTool
     }
 
     // 标注类型
-    enum Tool { None, Arrow, Line, Rect, Text }
+    enum Tool { None, Arrow, Line, Rect, Text, Mosaic }
 
     // 一条标注
     class Anno
@@ -169,6 +169,8 @@ namespace SnipTool
         public Point A;
         public Point B;
         public string Text;
+        public Color Color;
+        public float Width = 3f;
     }
 
     // 全屏选区遮罩：拖框 -> 可选标注(箭头/直线/方框) -> 打勾复制到剪贴板
@@ -193,12 +195,32 @@ namespace SnipTool
         Rectangle _selOrig;
         const int HS = 8;         // 控制点大小
 
-        // 工具条按钮：id 1箭头 2直线 3方框 7文字 4撤销 5取消 6确认
+        // 工具条按钮：id 1箭头 2直线 3方框 7文字 8马赛克 4撤销 9保存 5取消 6确认
         int _hover = 0;
         Rectangle _bar = Rectangle.Empty;
-        readonly int[] _ids = { 1, 2, 3, 7, 4, 5, 6 };
-        readonly Rectangle[] _rects = new Rectangle[7];
+        readonly int[] _ids = { 1, 2, 3, 7, 8, 4, 9, 5, 6 };
+        readonly Rectangle[] _rects = new Rectangle[9];
         const int BTN = 42;
+
+        // 颜色 / 粗细（样式子条，选了可着色工具时出现）
+        Color _color = Color.FromArgb(0xfa, 0x51, 0x51);
+        float _width = 3f;
+        static readonly Color[] PALETTE = {
+            Color.FromArgb(0xfa,0x51,0x51), // 红
+            Color.FromArgb(0xf4,0xb7,0x40), // 金
+            Color.FromArgb(0xe0,0x76,0x2a), // 橙
+            Color.FromArgb(0x2e,0xbe,0x6e), // 绿
+            Color.FromArgb(0x3b,0x82,0xf6), // 蓝
+            Color.White,                    // 白
+            Color.FromArgb(0x22,0x22,0x22), // 黑
+        };
+        static readonly float[] WIDTHS = { 2f, 4f, 7f };
+        bool _showStyle = false;
+        int _widthCount = 0;
+        Rectangle _styleBar = Rectangle.Empty;
+        readonly Rectangle[] _colorRects = new Rectangle[7];
+        readonly Rectangle[] _widthRects = new Rectangle[3];
+        const int SUB = 30;
 
         // 文字标注：用真输入框（保证中文输入法可用）。底色取自点击处背后的原图，
         // 在纯色背景上看着就是透明；宽度随字数自动伸缩，不留长条。
@@ -356,6 +378,9 @@ namespace SnipTool
                 int id = HitButton(e.Location);
                 if (id != 0) { HandleButton(id); return; }
 
+                // 颜色 / 粗细子条
+                if (HandleStyleClick(e.Location)) return;
+
                 // 未选工具时：拖角缩放 / 框内移动
                 if (_tool == Tool.None)
                 {
@@ -377,11 +402,11 @@ namespace SnipTool
                     BeginText(e.Location);
                     return;
                 }
-                // 其它标注工具：拖动画形状
+                // 其它标注工具（箭头/直线/方框/马赛克）：拖动画形状
                 if (_tool != Tool.None && _tool != Tool.Text && _sel.Contains(e.Location))
                 {
                     _annotating = true;
-                    _drawing = new Anno { Type = _tool, A = e.Location, B = e.Location };
+                    _drawing = new Anno { Type = _tool, A = e.Location, B = e.Location, Color = _color, Width = _width };
                     return;
                 }
                 // 否则重新框选（清掉旧标注）
@@ -431,6 +456,7 @@ namespace SnipTool
             {
                 int id = HitButton(e.Location);
                 if (id != 0) this.Cursor = Cursors.Hand;
+                else if (_showStyle && _styleBar.Contains(e.Location)) this.Cursor = Cursors.Hand;
                 else if (_tool == Tool.None)
                 {
                     int hd = HitHandle(e.Location);
@@ -479,10 +505,13 @@ namespace SnipTool
                 case 2: _tool = (_tool == Tool.Line) ? Tool.None : Tool.Line; break;
                 case 3: _tool = (_tool == Tool.Rect) ? Tool.None : Tool.Rect; break;
                 case 7: _tool = (_tool == Tool.Text) ? Tool.None : Tool.Text; break;
+                case 8: _tool = (_tool == Tool.Mosaic) ? Tool.None : Tool.Mosaic; break;
                 case 4: if (_annos.Count > 0) _annos.RemoveAt(_annos.Count - 1); break;
+                case 9: SavePng(); return;
                 case 5: this.Close(); return;
                 case 6: Confirm(); return;
             }
+            LayoutStyle();
             this.Invalidate();
         }
 
@@ -501,6 +530,41 @@ namespace SnipTool
             _bar = new Rectangle(bx, by, totalW, BTN);
             for (int i = 0; i < _rects.Length; i++)
                 _rects[i] = new Rectangle(bx + i * BTN, by, BTN, BTN);
+            LayoutStyle();
+        }
+
+        // 样式子条：颜色 + 粗细（选了可着色工具时显示）
+        void LayoutStyle()
+        {
+            _showStyle = (_tool == Tool.Arrow || _tool == Tool.Line || _tool == Tool.Rect || _tool == Tool.Text);
+            if (!_showStyle) return;
+            _widthCount = (_tool == Tool.Text) ? 0 : WIDTHS.Length;
+            int nColor = PALETTE.Length;
+            int gap = (_widthCount > 0) ? 12 : 0;
+            int w = 8 + nColor * SUB + gap + _widthCount * SUB + 8;
+            int x = _bar.X;
+            int y = _bar.Bottom + 6;
+            if (y + SUB > this.Height) y = _bar.Y - SUB - 6;   // 下方放不下就放上方
+            if (y < 0) y = 2;
+            if (x + w > this.Width) x = this.Width - w - 2;
+            if (x < 0) x = 2;
+            _styleBar = new Rectangle(x, y, w, SUB);
+
+            int cx = x + 8;
+            for (int i = 0; i < nColor; i++) { _colorRects[i] = new Rectangle(cx, y, SUB, SUB); cx += SUB; }
+            cx += gap;
+            for (int i = 0; i < _widthCount; i++) { _widthRects[i] = new Rectangle(cx, y, SUB, SUB); cx += SUB; }
+        }
+
+        // 点样式子条：命中就设置颜色/粗细
+        bool HandleStyleClick(Point p)
+        {
+            if (!_showStyle) return false;
+            for (int i = 0; i < PALETTE.Length; i++)
+                if (_colorRects[i].Contains(p)) { _color = PALETTE[i]; this.Invalidate(); return true; }
+            for (int i = 0; i < _widthCount; i++)
+                if (_widthRects[i].Contains(p)) { _width = WIDTHS[i]; this.Invalidate(); return true; }
+            return false;
         }
 
         // ---- 文字标注输入（真控件，底色贴合背景，宽度自适应）----
@@ -511,7 +575,7 @@ namespace SnipTool
             tb.BorderStyle = BorderStyle.None;
             tb.Multiline = false;
             tb.Font = AnnoFont;
-            tb.ForeColor = C_ANNO;
+            tb.ForeColor = _color;
             tb.Location = p;
             tb.Width = 24;   // 起始很窄，随打字增长
             this.Controls.Add(tb);
@@ -553,7 +617,7 @@ namespace SnipTool
             this.Controls.Remove(tb);
             tb.Dispose();
             if (!string.IsNullOrEmpty(txt) && txt.Trim().Length > 0)
-                _annos.Add(new Anno { Type = Tool.Text, A = pos, Text = txt });
+                _annos.Add(new Anno { Type = Tool.Text, A = pos, Text = txt, Color = _color });
             this.Focus();
             this.Invalidate();
         }
@@ -568,32 +632,59 @@ namespace SnipTool
             this.Invalidate();
         }
 
+        // 裁剪选区并把标注烧进去，返回最终图（含马赛克/箭头/文字等）
+        Bitmap RenderResult()
+        {
+            Rectangle r = _sel;
+            r.Intersect(new Rectangle(0, 0, _full.Width, _full.Height));
+            if (r.Width <= 0 || r.Height <= 0) return null;
+            var crop = new Bitmap(r.Width, r.Height);
+            using (Graphics g = Graphics.FromImage(crop))
+            {
+                g.DrawImage(_full, new Rectangle(0, 0, r.Width, r.Height), r, GraphicsUnit.Pixel);
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.TranslateTransform(-r.X, -r.Y);
+                foreach (var a in _annos) DrawAnno(g, a);
+            }
+            return crop;
+        }
+
         void Confirm()
         {
             CommitText();   // 落定未回车的文字
             try
             {
-                Rectangle r = _sel;
-                r.Intersect(new Rectangle(0, 0, _full.Width, _full.Height));
-                if (r.Width <= 0 || r.Height <= 0) { this.Close(); return; }
-                using (Bitmap crop = new Bitmap(r.Width, r.Height))
-                {
-                    using (Graphics g = Graphics.FromImage(crop))
-                    {
-                        g.DrawImage(_full, new Rectangle(0, 0, r.Width, r.Height), r, GraphicsUnit.Pixel);
-                        // 把标注烧进图里（平移到裁剪坐标系）
-                        g.SmoothingMode = SmoothingMode.AntiAlias;
-                        g.TranslateTransform(-r.X, -r.Y);
-                        foreach (var a in _annos) DrawAnno(g, a);
-                    }
-                    Clipboard.SetImage(crop);
-                }
+                using (var bmp = RenderResult())
+                    if (bmp != null) Clipboard.SetImage(bmp);
             }
             catch (Exception ex)
             {
                 MessageBox.Show("复制失败: " + ex.Message, "截图工具");
             }
             this.Close();
+        }
+
+        void SavePng()
+        {
+            CommitText();
+            using (var bmp = RenderResult())
+            {
+                if (bmp == null) { this.Close(); return; }
+                using (var dlg = new SaveFileDialog())
+                {
+                    dlg.Filter = "PNG 图片|*.png";
+                    dlg.FileName = "AltSnip_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".png";
+                    try { dlg.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures); }
+                    catch { }
+                    if (dlg.ShowDialog() == DialogResult.OK)
+                    {
+                        try { bmp.Save(dlg.FileName, ImageFormat.Png); }
+                        catch (Exception ex) { MessageBox.Show("保存失败: " + ex.Message, "截图工具"); return; }
+                        this.Close();
+                    }
+                    // 取消保存则留在界面继续编辑
+                }
+            }
         }
 
         // ================= 绘制 =================
@@ -682,7 +773,8 @@ namespace SnipTool
                 int id = _ids[i];
                 Rectangle c = _rects[i];
                 bool active = (id == 1 && _tool == Tool.Arrow) || (id == 2 && _tool == Tool.Line)
-                            || (id == 3 && _tool == Tool.Rect) || (id == 7 && _tool == Tool.Text);
+                            || (id == 3 && _tool == Tool.Rect) || (id == 7 && _tool == Tool.Text)
+                            || (id == 8 && _tool == Tool.Mosaic);
                 bool hover = (_hover == id);
                 if (active) Chip(g, c, C_GOLD, 46);
                 else if (hover) Chip(g, c, C_TEXT, 26);
@@ -694,10 +786,49 @@ namespace SnipTool
                     case 2: DrawLineIcon(g, c, ic); break;
                     case 3: DrawRectIcon(g, c, ic); break;
                     case 7: DrawTextIcon(g, c, ic); break;
+                    case 8: DrawMosaicIcon(g, c, ic); break;
                     case 4: DrawUndoIcon(g, c, _annos.Count == 0 ? Color.FromArgb(90, C_TEXT2) : ic); break;
+                    case 9: DrawSaveIcon(g, c, ic); break;
                     case 5: DrawCross(g, c, hover ? C_TEXT : C_TEXT2); break;
                     case 6: DrawCheck(g, c, C_GOLD); break;
                 }
+            }
+
+            if (_showStyle) DrawStyleBar(g);
+        }
+
+        // 颜色 + 粗细 子条
+        void DrawStyleBar(Graphics g)
+        {
+            using (var sh = new SolidBrush(Color.FromArgb(70, 0, 0, 0)))
+            using (var p = Rounded(new Rectangle(_styleBar.X, _styleBar.Y + 3, _styleBar.Width, _styleBar.Height), 9))
+                g.FillPath(sh, p);
+            using (var bg = new SolidBrush(Color.FromArgb(205, C_DEEP)))
+            using (var p = Rounded(_styleBar, 9))
+                g.FillPath(bg, p);
+
+            // 颜色圆点
+            for (int i = 0; i < PALETTE.Length; i++)
+            {
+                Rectangle c = _colorRects[i];
+                int d = 16, ox = c.Left + (c.Width - d) / 2, oy = c.Top + (c.Height - d) / 2;
+                using (var b = new SolidBrush(PALETTE[i]))
+                    g.FillEllipse(b, ox, oy, d, d);
+                if (PALETTE[i].GetBrightness() > 0.85f)   // 白色描个边免得看不见
+                    using (var pen = new Pen(Color.FromArgb(90, C_TEXT2), 1f))
+                        g.DrawEllipse(pen, ox, oy, d, d);
+                if (_color.ToArgb() == PALETTE[i].ToArgb())  // 选中：金色外圈
+                    using (var pen = new Pen(C_GOLD, 2f))
+                        g.DrawEllipse(pen, ox - 3, oy - 3, d + 6, d + 6);
+            }
+            // 粗细圆点（大小递增）
+            for (int i = 0; i < _widthCount; i++)
+            {
+                Rectangle c = _widthRects[i];
+                int d = 6 + i * 5, ox = c.Left + (c.Width - d) / 2, oy = c.Top + (c.Height - d) / 2;
+                bool sel = Math.Abs(_width - WIDTHS[i]) < 0.01f;
+                using (var b = new SolidBrush(sel ? C_GOLD : C_TEXT2))
+                    g.FillEllipse(b, ox, oy, d, d);
             }
         }
 
@@ -712,7 +843,23 @@ namespace SnipTool
         // ---- 标注绘制 ----
         void DrawAnno(Graphics g, Anno a)
         {
-            using (var pen = new Pen(C_ANNO, ANNO_W))
+            Color col = (a.Color.A == 0) ? C_ANNO : a.Color;   // 兼容未设色
+            float wd = a.Width > 0 ? a.Width : ANNO_W;
+
+            if (a.Type == Tool.Mosaic)
+            {
+                DrawMosaic(g, Rectangle.FromLTRB(Math.Min(a.A.X, a.B.X), Math.Min(a.A.Y, a.B.Y),
+                                                 Math.Max(a.A.X, a.B.X), Math.Max(a.A.Y, a.B.Y)));
+                return;
+            }
+            if (a.Type == Tool.Text)
+            {
+                if (!string.IsNullOrEmpty(a.Text))
+                    using (var br = new SolidBrush(col))
+                        g.DrawString(a.Text, AnnoFont, br, a.A.X, a.A.Y, StringFormat.GenericTypographic);
+                return;
+            }
+            using (var pen = new Pen(col, wd))
             {
                 pen.StartCap = LineCap.Round; pen.EndCap = LineCap.Round; pen.LineJoin = LineJoin.Round;
                 if (a.Type == Tool.Rect)
@@ -728,17 +875,33 @@ namespace SnipTool
                 {
                     g.DrawLine(pen, a.A, a.B);
                     double ang = Math.Atan2(a.B.Y - a.A.Y, a.B.X - a.A.X);
-                    float len = 10 + ANNO_W * 2.2f;
+                    float len = 10 + wd * 2.2f;
                     double a1 = ang + Math.PI - 0.5, a2 = ang + Math.PI + 0.5;
                     g.DrawLine(pen, a.B, new PointF(a.B.X + (float)(Math.Cos(a1) * len), a.B.Y + (float)(Math.Sin(a1) * len)));
                     g.DrawLine(pen, a.B, new PointF(a.B.X + (float)(Math.Cos(a2) * len), a.B.Y + (float)(Math.Sin(a2) * len)));
                 }
             }
-            if (a.Type == Tool.Text && !string.IsNullOrEmpty(a.Text))
+        }
+
+        // 马赛克：把区域缩小再放大，得到打码块（读取冻结原图，源坐标为屏幕坐标）
+        void DrawMosaic(Graphics g, Rectangle r)
+        {
+            r.Intersect(new Rectangle(0, 0, _full.Width, _full.Height));
+            if (r.Width < 2 || r.Height < 2) return;
+            int block = 10;
+            int sw = Math.Max(1, r.Width / block), sh = Math.Max(1, r.Height / block);
+            using (var small = new Bitmap(sw, sh))
             {
-                // 纯红字，无阴影，越简洁越好
-                using (var br = new SolidBrush(C_ANNO))
-                    g.DrawString(a.Text, AnnoFont, br, a.A.X, a.A.Y, StringFormat.GenericTypographic);
+                using (var sg = Graphics.FromImage(small))
+                {
+                    sg.InterpolationMode = InterpolationMode.HighQualityBilinear;
+                    sg.DrawImage(_full, new Rectangle(0, 0, sw, sh), r, GraphicsUnit.Pixel);
+                }
+                var oldI = g.InterpolationMode; var oldP = g.PixelOffsetMode;
+                g.InterpolationMode = InterpolationMode.NearestNeighbor;
+                g.PixelOffsetMode = PixelOffsetMode.Half;
+                g.DrawImage(small, r);
+                g.InterpolationMode = oldI; g.PixelOffsetMode = oldP;
             }
         }
 
@@ -785,6 +948,28 @@ namespace SnipTool
                 float cx = c.Left + c.Width / 2f;
                 g.DrawLine(pen, c.Left + 12, c.Top + 14, c.Right - 12, c.Top + 14); // 顶横
                 g.DrawLine(pen, cx, c.Top + 14, cx, c.Bottom - 13);                 // 竖
+            }
+        }
+
+        void DrawMosaicIcon(Graphics g, Rectangle c, Color col)
+        {
+            float x0 = c.Left + 12, y0 = c.Top + 12, s = (c.Width - 24) / 3f;
+            bool[] fill = { true, false, true, false, true, false, true, false, true };
+            using (var b = new SolidBrush(col))
+                for (int i = 0; i < 9; i++)
+                    if (fill[i])
+                        g.FillRectangle(b, x0 + (i % 3) * s, y0 + (i / 3) * s, s - 1.5f, s - 1.5f);
+        }
+
+        void DrawSaveIcon(Graphics g, Rectangle c, Color col)
+        {
+            using (var pen = IconPen(col, 2.2f))
+            {
+                float cx = c.Left + c.Width / 2f, ty = c.Top + 11, by = c.Bottom - 16;
+                g.DrawLine(pen, cx, ty, cx, by);            // 竖杆
+                g.DrawLine(pen, cx, by, cx - 5, by - 5);    // 箭头（朝下）
+                g.DrawLine(pen, cx, by, cx + 5, by - 5);
+                g.DrawLine(pen, c.Left + 11, c.Bottom - 11, c.Right - 11, c.Bottom - 11); // 底托
             }
         }
 
@@ -854,10 +1039,12 @@ namespace SnipTool
             f.Bounds = new Rectangle(0, 0, W, H);
             f._sel = new Rectangle(120, 95, 300, 175);
             f._hasSel = true;
-            f._tool = Tool.None;
-            f._annos.Add(new Anno { Type = Tool.Arrow, A = new Point(390, 250), B = new Point(250, 160) });
-            f._annos.Add(new Anno { Type = Tool.Rect, A = new Point(150, 120), B = new Point(240, 175) });
-            f._annos.Add(new Anno { Type = Tool.Text, A = new Point(300, 255), Text = "看这里" });
+            f._tool = Tool.Rect;
+            f._color = PALETTE[3]; f._width = WIDTHS[1];
+            f._annos.Add(new Anno { Type = Tool.Arrow, A = new Point(400, 250), B = new Point(255, 160), Color = PALETTE[0], Width = 4 });
+            f._annos.Add(new Anno { Type = Tool.Rect, A = new Point(150, 118), B = new Point(240, 172), Color = PALETTE[3], Width = 4 });
+            f._annos.Add(new Anno { Type = Tool.Mosaic, A = new Point(330, 100), B = new Point(410, 150) });
+            f._annos.Add(new Anno { Type = Tool.Text, A = new Point(285, 250), Text = "看这里", Color = PALETTE[1] });
             f.LayoutButtons();
             f._hover = hover;
             using (var outBmp = new Bitmap(W, H))
