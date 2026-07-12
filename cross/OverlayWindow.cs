@@ -1,6 +1,7 @@
 using System;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Media;
 using SkiaSharp;
 
@@ -20,10 +21,11 @@ public sealed class OverlayWindow : Window
         ShowInTaskbar = false;
         Topmost = true;
         Background = Brushes.Black;
+        Cursor = OverlayControl.CurHidden;   // 全局隐藏系统鼠标（改用自绘十字）
         WindowStartupLocation = WindowStartupLocation.Manual;
         Position = bounds.Position;   // 先落到目标屏
 
-        var textLayer = new Canvas();
+        var textLayer = new Canvas { Cursor = OverlayControl.CurHidden };
         _control = new OverlayControl(shot, Close, Copy) { TextLayer = textLayer };
         var grid = new Grid();
         grid.Children.Add(_control);

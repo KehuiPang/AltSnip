@@ -51,7 +51,23 @@ public sealed class OverlayControl : Control
     // 鼠标准星（初始框选阶段）
     SKPoint _mouse;
     bool _mouseIn;
-    static readonly Cursor CurHidden = new Cursor(StandardCursorType.None);
+    // 透明 1×1 位图光标：可靠隐藏系统鼠标（比 StandardCursorType.None 更稳）
+    internal static readonly Cursor CurHidden = MakeInvisibleCursor();
+
+    static Cursor MakeInvisibleCursor()
+    {
+        try
+        {
+            using var sk = new SKBitmap(1, 1);            // 默认全透明
+            using var img = SKImage.FromBitmap(sk);
+            using var data = img.Encode(SKEncodedImageFormat.Png, 100);
+            using var ms = new System.IO.MemoryStream();
+            data.SaveTo(ms);
+            ms.Position = 0;
+            return new Cursor(new Bitmap(ms), new PixelPoint(0, 0));
+        }
+        catch { return new Cursor(StandardCursorType.None); }
+    }
 
     // 移动/缩放
     bool _moving, _resizing;
@@ -190,13 +206,11 @@ public sealed class OverlayControl : Control
         {
             if (_mouseIn)
             {
-                // 鼠标处的小十字准星（带中心空隙），暗底上金色醒目
-                using var gp = new SKPaint { Color = C_GOLD, StrokeWidth = 1.5f, IsAntialias = true, StrokeCap = SKStrokeCap.Round };
-                float x = _mouse.X, y = _mouse.Y, arm = 9, gap = 3;
-                c.DrawLine(x - arm, y, x - gap, y, gp);
-                c.DrawLine(x + gap, y, x + arm, y, gp);
-                c.DrawLine(x, y - arm, x, y - gap, gp);
-                c.DrawLine(x, y + gap, x, y + arm, gp);
+                // 鼠标处的小十字准星：实线连续，金色（系统鼠标已隐藏，等于把鼠标变成十字）
+                using var gp = new SKPaint { Color = C_GOLD, StrokeWidth = 1.5f, IsAntialias = true };
+                float x = _mouse.X, y = _mouse.Y, arm = 11;
+                c.DrawLine(x - arm, y, x + arm, y, gp);
+                c.DrawLine(x, y - arm, x, y + arm, gp);
             }
             DrawTip(c);
         }
