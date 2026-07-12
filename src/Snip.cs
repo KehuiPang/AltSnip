@@ -49,9 +49,15 @@ namespace SnipTool
             this.Opacity = 0;
             this.Load += (s, e) => { this.Visible = false; };
 
+            // 用打进 exe 的 Logo 作为托盘/窗口图标
+            Icon appIcon;
+            try { appIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); }
+            catch { appIcon = SystemIcons.Application; }
+            this.Icon = appIcon;
+
             _tray = new NotifyIcon();
-            _tray.Icon = SystemIcons.Application;
-            _tray.Text = "截图工具 (Alt+A)";
+            _tray.Icon = appIcon;
+            _tray.Text = "AltSnip 截图 (Alt+A)";
             _tray.Visible = true;
 
             var menu = new ContextMenuStrip();
@@ -118,10 +124,16 @@ namespace SnipTool
         }
 
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+            if (args.Length > 0 && args[0] == "--preview")
+            {
+                int hover = args.Length > 2 ? int.Parse(args[2]) : 1;
+                OverlayForm.SavePreview(args.Length > 1 ? args[1] : "preview.png", hover);
+                return;
+            }
             Application.Run(new TrayApp());
         }
     }
@@ -138,8 +150,16 @@ namespace SnipTool
 
         Rectangle _okBtn = Rectangle.Empty;
         Rectangle _cancelBtn = Rectangle.Empty;
-        const int BTN = 34;
-        const int GAP = 8;
+        int _hover = 0;   // 0 无 / 1 对勾 / 2 叉
+        const int BTN = 44;
+
+        // 暖琥珀 VI
+        static readonly Color C_CARD   = Color.FromArgb(0x1d, 0x15, 0x0b);
+        static readonly Color C_GOLD   = Color.FromArgb(0xf4, 0xb7, 0x40);
+        static readonly Color C_ORANGE = Color.FromArgb(0xe0, 0x76, 0x2a);
+        static readonly Color C_TEXT   = Color.FromArgb(0xf3, 0xec, 0xe0);
+        static readonly Color C_TEXT2  = Color.FromArgb(0xb0, 0x9b, 0x80);
+        static readonly Color C_DEEP   = Color.FromArgb(0x0e, 0x0a, 0x06);
 
         public OverlayForm(Bitmap full, Rectangle vs)
         {
@@ -180,6 +200,8 @@ namespace SnipTool
             // 否则开始新的拖框
             _dragging = true;
             _hasSel = false;
+            _hover = 0;
+            this.Cursor = Cursors.Cross;
             _start = e.Location;
             _sel = new Rectangle(e.Location, Size.Empty);
             this.Invalidate();
@@ -187,13 +209,24 @@ namespace SnipTool
 
         void OnMove(object s, MouseEventArgs e)
         {
-            if (!_dragging) return;
-            int x = Math.Min(_start.X, e.X);
-            int y = Math.Min(_start.Y, e.Y);
-            int w = Math.Abs(_start.X - e.X);
-            int h = Math.Abs(_start.Y - e.Y);
-            _sel = new Rectangle(x, y, w, h);
-            this.Invalidate();
+            if (_dragging)
+            {
+                int x = Math.Min(_start.X, e.X);
+                int y = Math.Min(_start.Y, e.Y);
+                int w = Math.Abs(_start.X - e.X);
+                int h = Math.Abs(_start.Y - e.Y);
+                _sel = new Rectangle(x, y, w, h);
+                this.Invalidate();
+                return;
+            }
+            // 选区已定：悬停在按钮上时切换成手型光标并高亮，否则保持十字
+            if (_hasSel)
+            {
+                int h = _okBtn.Contains(e.Location) ? 1
+                      : _cancelBtn.Contains(e.Location) ? 2 : 0;
+                this.Cursor = (h == 0) ? Cursors.Cross : Cursors.Hand;
+                if (h != _hover) { _hover = h; this.Invalidate(); }
+            }
         }
 
         void OnUp(object s, MouseEventArgs e)
@@ -215,8 +248,9 @@ namespace SnipTool
 
         void LayoutButtons()
         {
-            // 按钮放在选区右下角下方；若空间不足则放到框内右下
-            int totalW = BTN * 2 + GAP;
+            // 胶囊工具条放选区右下角下方；空间不足则收进框内右下（叉在左、勾在右）
+            const int GAP = 8;
+            int totalW = BTN * 2;
             int bx = _sel.Right - totalW;
             int by = _sel.Bottom + GAP;
             if (bx < _sel.Left) bx = _sel.Left;
@@ -225,7 +259,7 @@ namespace SnipTool
             if (bx < 0) bx = 2;
 
             _cancelBtn = new Rectangle(bx, by, BTN, BTN);
-            _okBtn = new Rectangle(bx + BTN + GAP, by, BTN, BTN);
+            _okBtn = new Rectangle(bx + BTN, by, BTN, BTN);
         }
 
         void Confirm()
@@ -251,7 +285,11 @@ namespace SnipTool
 
         protected override void OnPaint(PaintEventArgs e)
         {
-            Graphics g = e.Graphics;
+            Render(e.Graphics);
+        }
+
+        public void Render(Graphics g)
+        {
             // 画冻结屏幕
             g.DrawImageUnscaled(_full, 0, 0);
             // 半透明暗色遮罩铺满
@@ -262,21 +300,24 @@ namespace SnipTool
             {
                 // 选区内还原成清晰原图
                 g.DrawImage(_full, _sel, _sel, GraphicsUnit.Pixel);
-                // 边框
-                using (var pen = new Pen(Color.FromArgb(0, 174, 255), 2))
+                // 边框（暖金）
+                g.SmoothingMode = SmoothingMode.None;
+                using (var pen = new Pen(C_GOLD, 1.6f))
                     g.DrawRectangle(pen, _sel);
-                // 尺寸标注
-                string info = _sel.Width + " x " + _sel.Height;
-                using (var f = new Font("Segoe UI", 9))
-                using (var bg = new SolidBrush(Color.FromArgb(200, 0, 0, 0)))
-                using (var fg = new SolidBrush(Color.White))
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                // 尺寸标注（暖墨底 + 金字）
+                string info = _sel.Width + " × " + _sel.Height;
+                using (var f = new Font("Segoe UI", 9f, FontStyle.Regular))
+                using (var bg = new SolidBrush(Color.FromArgb(235, C_DEEP)))
+                using (var fg = new SolidBrush(C_GOLD))
                 {
                     SizeF sz = g.MeasureString(info, f);
                     float tx = _sel.Left;
-                    float ty = _sel.Top - sz.Height - 4;
+                    float ty = _sel.Top - sz.Height - 6;
                     if (ty < 0) ty = _sel.Top + 4;
-                    g.FillRectangle(bg, tx, ty, sz.Width + 8, sz.Height + 2);
-                    g.DrawString(info, f, fg, tx + 4, ty + 1);
+                    using (var p = Rounded(new Rectangle((int)tx, (int)ty, (int)sz.Width + 12, (int)sz.Height + 4), 4))
+                        g.FillPath(bg, p);
+                    g.DrawString(info, f, fg, tx + 6, ty + 2);
                 }
 
                 if (_hasSel)
@@ -284,49 +325,85 @@ namespace SnipTool
             }
             else if (!_dragging)
             {
-                // 提示语
-                string tip = "拖动鼠标框选区域   ·   Enter/✓ 复制   ·   Esc 取消";
-                using (var f = new Font("Segoe UI", 12))
-                using (var bg = new SolidBrush(Color.FromArgb(160, 0, 0, 0)))
-                using (var fg = new SolidBrush(Color.White))
+                // 提示语（暖墨底 + 暖白字，金色圆点点睛）
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                string tip = "拖动框选区域        Enter 复制        Esc 取消";
+                using (var f = new Font("Microsoft YaHei", 11f))
+                using (var bg = new SolidBrush(Color.FromArgb(210, C_DEEP)))
+                using (var fg = new SolidBrush(C_TEXT))
                 {
                     SizeF sz = g.MeasureString(tip, f);
                     float tx = (this.Width - sz.Width) / 2;
-                    float ty = 40;
-                    g.FillRectangle(bg, tx - 12, ty - 6, sz.Width + 24, sz.Height + 12);
+                    float ty = 44;
+                    using (var p = Rounded(new Rectangle((int)(tx - 18), (int)(ty - 9), (int)sz.Width + 36, (int)sz.Height + 18), 10))
+                        g.FillPath(bg, p);
+                    // 暖金点睛描边
+                    using (var pen = new Pen(Color.FromArgb(90, C_ORANGE), 1f))
+                    using (var p = Rounded(new Rectangle((int)(tx - 18), (int)(ty - 9), (int)sz.Width + 35, (int)sz.Height + 17), 10))
+                        g.DrawPath(pen, p);
                     g.DrawString(tip, f, fg, tx, ty);
                 }
             }
         }
 
+        // 微信风悬浮工具条：暖墨胶囊底 + 细描边 + 细笔画图标，悬停高亮
         void DrawButtons(Graphics g)
         {
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            // 取消 ✗（红）
-            DrawButton(g, _cancelBtn, Color.FromArgb(230, 76, 76));
-            using (var pen = new Pen(Color.White, 3))
-            {
-                int p = 10;
-                g.DrawLine(pen, _cancelBtn.Left + p, _cancelBtn.Top + p, _cancelBtn.Right - p, _cancelBtn.Bottom - p);
-                g.DrawLine(pen, _cancelBtn.Right - p, _cancelBtn.Top + p, _cancelBtn.Left + p, _cancelBtn.Bottom - p);
-            }
-            // 确认 ✓（绿）
-            DrawButton(g, _okBtn, Color.FromArgb(46, 190, 110));
-            using (var pen = new Pen(Color.White, 3))
+            Rectangle bar = Rectangle.Union(_cancelBtn, _okBtn);
+
+            // 投影
+            using (var sh = new SolidBrush(Color.FromArgb(90, 0, 0, 0)))
+            using (var p = Rounded(new Rectangle(bar.X, bar.Y + 3, bar.Width, bar.Height), 11))
+                g.FillPath(sh, p);
+            // 胶囊底（暖墨面板）
+            using (var bg = new SolidBrush(C_CARD))
+            using (var p = Rounded(bar, 11))
+                g.FillPath(bg, p);
+            // 悬停高亮（金=确认 / 暖白=取消）
+            if (_hover == 1) FillHover(g, _okBtn, C_GOLD);
+            else if (_hover == 2) FillHover(g, _cancelBtn, C_TEXT);
+            // 橙色结构描边
+            using (var pen = new Pen(Color.FromArgb(120, C_ORANGE), 1f))
+            using (var p = Rounded(new Rectangle(bar.X, bar.Y, bar.Width - 1, bar.Height - 1), 11))
+                g.DrawPath(pen, p);
+            // 中缝分隔线
+            using (var pen = new Pen(Color.FromArgb(70, C_TEXT2), 1f))
+                g.DrawLine(pen, bar.X + BTN, bar.Y + 11, bar.X + BTN, bar.Bottom - 11);
+
+            DrawCross(g, _cancelBtn, _hover == 2 ? C_TEXT : C_TEXT2);
+            DrawCheck(g, _okBtn, C_GOLD);
+        }
+
+        void FillHover(Graphics g, Rectangle cell, Color c)
+        {
+            Rectangle r = Rectangle.Inflate(cell, -5, -5);
+            using (var b = new SolidBrush(Color.FromArgb(38, c)))
+            using (var p = Rounded(r, 8))
+                g.FillPath(b, p);
+        }
+
+        void DrawCross(Graphics g, Rectangle c, Color col)
+        {
+            using (var pen = new Pen(col, 2.4f))
             {
                 pen.StartCap = LineCap.Round; pen.EndCap = LineCap.Round;
-                var p1 = new Point(_okBtn.Left + 9, _okBtn.Top + 18);
-                var p2 = new Point(_okBtn.Left + 15, _okBtn.Top + 24);
-                var p3 = new Point(_okBtn.Right - 8, _okBtn.Top + 10);
-                g.DrawLines(pen, new[] { p1, p2, p3 });
+                int p = 16;
+                g.DrawLine(pen, c.Left + p, c.Top + p, c.Right - p, c.Bottom - p);
+                g.DrawLine(pen, c.Right - p, c.Top + p, c.Left + p, c.Bottom - p);
             }
         }
 
-        void DrawButton(Graphics g, Rectangle r, Color c)
+        void DrawCheck(Graphics g, Rectangle c, Color col)
         {
-            using (var b = new SolidBrush(c))
-            using (var path = Rounded(r, 8))
-                g.FillPath(b, path);
+            using (var pen = new Pen(col, 2.6f))
+            {
+                pen.StartCap = LineCap.Round; pen.EndCap = LineCap.Round; pen.LineJoin = LineJoin.Round;
+                var p1 = new PointF(c.Left + 14f, c.Top + 23f);
+                var p2 = new PointF(c.Left + 20f, c.Top + 29f);
+                var p3 = new PointF(c.Left + 31f, c.Top + 16f);
+                g.DrawLines(pen, new[] { p1, p2, p3 });
+            }
         }
 
         GraphicsPath Rounded(Rectangle r, int radius)
@@ -339,6 +416,35 @@ namespace SnipTool
             path.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
             path.CloseFigure();
             return path;
+        }
+
+        // 隐藏开发用：把真实绘制渲染成 PNG，便于核对视觉。用法 Snip.exe --preview out.png
+        internal static void SavePreview(string path, int hover)
+        {
+            int W = 560, H = 380;
+            var bg = new Bitmap(W, H);
+            using (var g = Graphics.FromImage(bg))
+            {
+                using (var br = new System.Drawing.Drawing2D.LinearGradientBrush(
+                    new Rectangle(0, 0, W, H), Color.FromArgb(48, 76, 120), Color.FromArgb(18, 26, 44), 45f))
+                    g.FillRectangle(br, 0, 0, W, H);
+                using (var b = new SolidBrush(Color.FromArgb(238, 238, 240)))
+                    g.FillRectangle(b, 70, 70, 230, 130);
+                using (var b = new SolidBrush(Color.FromArgb(150, 170, 210)))
+                    g.FillRectangle(b, 320, 90, 170, 110);
+            }
+            var f = new OverlayForm(bg, new Rectangle(0, 0, W, H));
+            f.Bounds = new Rectangle(0, 0, W, H);
+            f._sel = new Rectangle(120, 95, 300, 180);
+            f._hasSel = true;
+            f.LayoutButtons();
+            f._hover = hover;
+            using (var outBmp = new Bitmap(W, H))
+            {
+                using (var g = Graphics.FromImage(outBmp)) f.Render(g);
+                outBmp.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+            }
+            f.Dispose();
         }
     }
 }

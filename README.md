@@ -1,4 +1,8 @@
-# AltSnip
+<p align="center">
+  <img src="logo_256.png" width="112" alt="AltSnip logo">
+</p>
+
+<h1 align="center">AltSnip</h1>
 
 A tiny, no-dependency screenshot tool for Windows. Press **Alt + A**, drag a box, click the green check — your screenshot is on the clipboard, ready to paste anywhere.
 
