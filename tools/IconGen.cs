@@ -1,6 +1,6 @@
-// AltSnip 图标/Logo 生成器 —— 按 OPC「暖琥珀」品牌 VI 绘制。
-// 概念：暖墨圆角底 + 金色取景框四角标（截图/选区语义）+ 橙环金点快门。
-// 金=点睛，橙=结构线，深底留白。生成多尺寸 app.ico 与 logo_256.png。
+// AltSnip 图标/Logo 生成器 —— 按「无为」品牌 VI 绘制。
+// 产品图标规范：玄墨/靛青渐变方圆底 + 居中月白「○带缺口」(一念之门·圆相) + 缺口一点朱赭"一念"火种。
+// 色板：玄墨黑 #16191E / 靛青 #274A63 / 月白 #F4F6F8 / 银灰 #B7C0C7 / 朱赭 #C05F3C。
 // 编译： csc /target:exe /out:IconGen.exe /reference:System.Drawing.dll tools\IconGen.cs
 // 运行： IconGen.exe <输出目录>
 using System;
@@ -12,13 +12,14 @@ using System.IO;
 
 class IconGen
 {
-    // 暖琥珀 VI
-    static readonly Color BG1 = ColorFromHex("#171109");
-    static readonly Color BG2 = ColorFromHex("#0b0805");
-    static readonly Color GOLD = ColorFromHex("#f4b740");
-    static readonly Color ORANGE = ColorFromHex("#e0762a");
+    // 无为 VI
+    static readonly Color INK    = Hex("#16191E"); // 玄墨黑
+    static readonly Color INK2   = Hex("#22384A"); // 玄墨→靛青（压深）
+    static readonly Color MOON   = Hex("#F4F6F8"); // 月白
+    static readonly Color SILVER = Hex("#AEB8C0"); // 银灰（圆环渐隐）
+    static readonly Color SPARK  = Hex("#C05F3C"); // 朱赭·一念火种
 
-    static Color ColorFromHex(string h)
+    static Color Hex(string h)
     {
         h = h.TrimStart('#');
         return Color.FromArgb(
@@ -33,63 +34,46 @@ class IconGen
         using (var g = Graphics.FromImage(bmp))
         {
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
             g.Clear(Color.Transparent);
 
-            float f = S / 256f;
-            float radius = 56 * f;
+            // 方圆底：玄墨黑 → 靛青 对角渐变
+            float radius = 58 * S / 256f;
             var tile = new RectangleF(0.5f, 0.5f, S - 1f, S - 1f);
-
-            // 暖墨圆角底（对角渐变）
             using (var path = Rounded(tile, radius))
-            {
-                using (var br = new LinearGradientBrush(
-                    new PointF(0, 0), new PointF(S, S), BG1, BG2))
-                    g.FillPath(br, path);
-                // 极细橙色结构描边
-                using (var pen = new Pen(Color.FromArgb(70, ORANGE), Math.Max(1f, 1.2f * f)))
-                    g.DrawPath(pen, path);
-            }
+            using (var br = new LinearGradientBrush(new PointF(0, 0), new PointF(S, S), INK, INK2))
+                g.FillPath(br, path);
 
-            // 取景框四角标（金）
-            float inset = 62 * f;
-            float arm = 40 * f;
-            float stroke = 18 * f;
-            using (var pen = new Pen(GOLD, stroke))
-            {
-                pen.StartCap = LineCap.Round;
-                pen.EndCap = LineCap.Round;
-                pen.LineJoin = LineJoin.Round;
-                float lo = inset, hi = S - inset;
-                Bracket(g, pen, new PointF(lo, lo), new PointF(lo + arm, lo), new PointF(lo, lo + arm)); // 左上
-                Bracket(g, pen, new PointF(hi, lo), new PointF(hi - arm, lo), new PointF(hi, lo + arm)); // 右上
-                Bracket(g, pen, new PointF(lo, hi), new PointF(lo + arm, hi), new PointF(lo, hi - arm)); // 左下
-                Bracket(g, pen, new PointF(hi, hi), new PointF(hi - arm, hi), new PointF(hi, hi - arm)); // 右下
-            }
-
-            // 快门：橙色结构环 + 金色点睛（仅大尺寸画环，小尺寸只留金点保清晰）
+            // 一念之门·圆相：月白圆环，右下留气口
             float cx = S / 2f, cy = S / 2f;
-            if (S >= 48)
+            float ringR = S * 0.30f;
+            float sw = S * 0.072f;
+            var ringRect = new RectangleF(cx - ringR, cy - ringR, ringR * 2, ringR * 2);
+            float startAngle = 70f, sweep = 300f;   // 缺口约 60°，在右下
+            using (var rb = new LinearGradientBrush(
+                new PointF(cx - ringR, cy - ringR), new PointF(cx + ringR, cy + ringR), MOON, SILVER))
+            using (var pen = new Pen(rb, sw) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                g.DrawArc(pen, ringRect, startAngle, sweep);
+
+            // 缺口下端一点朱赭（含柔光）
+            double a = startAngle * Math.PI / 180.0;
+            float dx = cx + (float)(Math.Cos(a) * ringR);
+            float dy = cy + (float)(Math.Sin(a) * ringR);
+            float dotR = sw * 0.60f;
+            using (var glow = new GraphicsPath())
             {
-                float ring = 26 * f;
-                using (var pen = new Pen(ORANGE, 9 * f))
-                    g.DrawEllipse(pen, cx - ring, cy - ring, ring * 2, ring * 2);
+                glow.AddEllipse(dx - dotR * 2.6f, dy - dotR * 2.6f, dotR * 5.2f, dotR * 5.2f);
+                using (var pgb = new PathGradientBrush(glow)
+                {
+                    CenterColor = Color.FromArgb(120, SPARK),
+                    SurroundColors = new[] { Color.FromArgb(0, SPARK) },
+                    CenterPoint = new PointF(dx, dy),
+                })
+                    g.FillPath(pgb, glow);
             }
-            float dot = (S >= 48 ? 12f : 20f) * f;
-            using (var br = new SolidBrush(GOLD))
-                g.FillEllipse(br, cx - dot, cy - dot, dot * 2, dot * 2);
+            using (var db = new SolidBrush(SPARK))
+                g.FillEllipse(db, dx - dotR, dy - dotR, dotR * 2, dotR * 2);
         }
         return bmp;
-    }
-
-    static void Bracket(Graphics g, Pen pen, PointF elbow, PointF a, PointF b)
-    {
-        using (var p = new GraphicsPath())
-        {
-            p.AddLine(a, elbow);
-            p.AddLine(elbow, b);
-            g.DrawPath(pen, p);
-        }
     }
 
     static GraphicsPath Rounded(RectangleF r, float radius)
@@ -124,20 +108,17 @@ class IconGen
         using (var fs = File.Create(icoPath))
         using (var w = new BinaryWriter(fs))
         {
-            w.Write((short)0);            // reserved
-            w.Write((short)1);            // type = icon
-            w.Write((short)sizes.Length); // count
+            w.Write((short)0);
+            w.Write((short)1);
+            w.Write((short)sizes.Length);
             int offset = 6 + 16 * sizes.Length;
             for (int i = 0; i < sizes.Length; i++)
             {
                 byte wh = (byte)(sizes[i] >= 256 ? 0 : sizes[i]);
-                w.Write(wh); w.Write(wh); // width, height
-                w.Write((byte)0);         // colors
-                w.Write((byte)0);         // reserved
-                w.Write((short)1);        // planes
-                w.Write((short)32);       // bpp
-                w.Write(pngs[i].Length);  // size
-                w.Write(offset);          // offset
+                w.Write(wh); w.Write(wh);
+                w.Write((byte)0); w.Write((byte)0);
+                w.Write((short)1); w.Write((short)32);
+                w.Write(pngs[i].Length); w.Write(offset);
                 offset += pngs[i].Length;
             }
             foreach (var png in pngs) w.Write(png);
