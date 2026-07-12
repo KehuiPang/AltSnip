@@ -3,6 +3,11 @@
 *.pdb
 *.obj
 
+# .NET / Avalonia (cross-platform project)
+bin/
+obj/
+out/
+
 # Editor / OS
 .vs/
 *.user

@@ -1,0 +1,47 @@
+name: build-cross
+
+on:
+  push:
+    branches: [cross-platform]
+    paths: ['cross/**', '.github/workflows/build.yml']
+  pull_request:
+    paths: ['cross/**']
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: macos-latest
+            rid: osx-arm64
+          - os: macos-13
+            rid: osx-x64
+          - os: ubuntu-latest
+            rid: linux-x64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish
+        run: >
+          dotnet publish cross/AltSnip.Desktop.csproj
+          -c Release
+          -r ${{ matrix.rid }}
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -o out/${{ matrix.rid }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AltSnip-${{ matrix.rid }}
+          path: out/${{ matrix.rid }}

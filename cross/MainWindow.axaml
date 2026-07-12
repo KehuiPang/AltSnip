@@ -1,0 +1,13 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AltSnip.MainWindow"
+        Width="480" Height="280"
+        Title="AltSnip"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen">
+  <StackPanel Margin="32" Spacing="14" VerticalAlignment="Center">
+    <TextBlock Text="AltSnip" FontSize="34" FontWeight="Bold" />
+    <TextBlock Text="Cross-platform build — foundation is up." Opacity="0.75" />
+    <TextBlock x:Name="Info" Opacity="0.55" FontSize="12" TextWrapping="Wrap" />
+  </StackPanel>
+</Window>
