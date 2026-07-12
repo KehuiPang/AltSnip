@@ -1,7 +1,6 @@
 using System;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Media;
 using SkiaSharp;
 
@@ -23,20 +22,13 @@ public sealed class OverlayWindow : Window
         Width = bounds.Width / scaling;
         Height = bounds.Height / scaling;
 
-        _control = new OverlayControl(shot, Close, CopyAndClose);
+        _control = new OverlayControl(shot, Close, Copy);
         Content = _control;
-
-        KeyDown += (_, e) =>
-        {
-            if (e.Key == Key.Escape) Close();
-            else if (e.Key == Key.Enter || e.Key == Key.Return) _control.Confirm();
-        };
     }
 
-    void CopyAndClose(SKImage image)
+    void Copy(SKImage image)
     {
         try { Platform.PlatformServices.Current.CopyImageToClipboard(image); } catch { }
-        Close();
     }
 
     protected override void OnOpened(EventArgs e)
