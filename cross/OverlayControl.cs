@@ -136,7 +136,6 @@ public sealed class OverlayControl : Control
             _dipW = finalSize.Width;
             _dipH = finalSize.Height;
             _scale = _src.Width / _dipW;
-            Log.W($"arrange final={finalSize} dip={_dipW}x{_dipH} scale={_scale:0.00}");
             Repaint();
         }
         return r;
@@ -191,9 +190,13 @@ public sealed class OverlayControl : Control
         {
             if (_mouseIn)
             {
-                using var gp = new SKPaint { Color = C_GOLD.WithAlpha(220), StrokeWidth = 1, IsAntialias = false };
-                c.DrawLine(0, _mouse.Y, (float)DipW, _mouse.Y, gp);
-                c.DrawLine(_mouse.X, 0, _mouse.X, (float)DipH, gp);
+                // 鼠标处的小十字准星（带中心空隙），暗底上金色醒目
+                using var gp = new SKPaint { Color = C_GOLD, StrokeWidth = 1.5f, IsAntialias = true, StrokeCap = SKStrokeCap.Round };
+                float x = _mouse.X, y = _mouse.Y, arm = 9, gap = 3;
+                c.DrawLine(x - arm, y, x - gap, y, gp);
+                c.DrawLine(x + gap, y, x + arm, y, gp);
+                c.DrawLine(x, y - arm, x, y - gap, gp);
+                c.DrawLine(x, y + gap, x, y + arm, gp);
             }
             DrawTip(c);
         }
