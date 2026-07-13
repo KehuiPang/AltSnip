@@ -15,7 +15,11 @@ cp out/win-x64/AltSnip.exe dist/AltSnip-Windows-x64.exe
 python3 -m pip install --quiet --disable-pip-version-check pillow 2>/dev/null || true
 python3 - <<'PY'
 from PIL import Image
-src = Image.open("logo_256.png").convert("RGBA")
+# 用 1024 原生渲染的 logo（tools/gen_logo.py 生成）——下采样到 824 才锐利；
+# 若缺失则退回 256（会略糊）。
+import os
+src_path = "logo_1024.png" if os.path.exists("logo_1024.png") else "logo_256.png"
+src = Image.open(src_path).convert("RGBA")
 BASE, ART = 1024, 824               # 画面占 ~80%，四周透明留白
 art = src.resize((ART, ART), Image.LANCZOS)
 canvas = Image.new("RGBA", (BASE, BASE), (0, 0, 0, 0))
