@@ -37,7 +37,9 @@ public sealed class OverlayControl : Control
     public Canvas? TextLayer { get; set; }
 
     readonly SKBitmap _frame;             // 物理像素帧缓冲（尺寸=截图，只建一次）
+    readonly SKBitmap _dimmed;            // 预烘焙「截图+压暗蒙版」，画框时每帧直接铺，省全屏混合
     Bitmap? _ava;                         // 每次重绘换一张 Avalonia 位图（旧的立即释放）
+    bool _dirty = true;                   // 脏标记：把光栅化合并到每帧渲染只做一次，避免每个指针事件都重绘
     double _scale = 1;
     double _dipW, _dipH;
     double DipW => _dipW;
@@ -122,6 +124,14 @@ public sealed class OverlayControl : Control
         _onClose = onClose;
         _onCopy = onCopy;
         _frame = new SKBitmap(src.Width, src.Height, SKColorType.Bgra8888, SKAlphaType.Premul);
+        // 预烘焙「截图 + 压暗蒙版」一次：画框时每帧只铺这张不透明图，省掉每帧的全屏截图重绘+蒙版混合
+        _dimmed = new SKBitmap(src.Width, src.Height, SKColorType.Bgra8888, SKAlphaType.Premul);
+        using (var dc = new SKCanvas(_dimmed))
+        {
+            dc.DrawBitmap(_src, 0, 0);
+            using var p = new SKPaint { Color = new SKColor(0, 0, 0, 120) };
+            dc.DrawRect(new SKRect(0, 0, src.Width, src.Height), p);
+        }
         Focusable = true;
         Cursor = CurHidden;   // 隐藏系统灰十字，改用自绘金色准星
     }
@@ -157,12 +167,19 @@ public sealed class OverlayControl : Control
         return r;
     }
 
+    // 只置脏标记并请求渲染；真正的光栅化推迟到 Render()，同一帧内多次调用只光栅化一次
     void Repaint()
+    {
+        _dirty = true;
+        InvalidateVisual();
+    }
+
+    void RebuildFrame()
     {
         if (_dipW <= 0) return;
         using (var c = new SKCanvas(_frame))
         {
-            c.Clear(SKColors.Black);
+            // 不需要 Clear：_dimmed 不透明且铺满整帧
             c.Scale((float)_scale);
             DrawScene(c);
         }
@@ -170,11 +187,11 @@ public sealed class OverlayControl : Control
         _ava = new Bitmap(Avalonia.Platform.PixelFormat.Bgra8888, Avalonia.Platform.AlphaFormat.Premul,
             _frame.GetPixels(), new PixelSize(_frame.Width, _frame.Height), new Vector(96, 96), _frame.RowBytes);
         old?.Dispose();   // 释放上一张，杜绝泄漏
-        InvalidateVisual();
     }
 
     public override void Render(DrawingContext ctx)
     {
+        if (_dirty) { RebuildFrame(); _dirty = false; }
         if (_ava != null) ctx.DrawImage(_ava, new Rect(0, 0, _dipW, _dipH));
     }
 
@@ -182,9 +199,7 @@ public sealed class OverlayControl : Control
     void DrawScene(SKCanvas c)
     {
         var full = new SKRect(0, 0, (float)DipW, (float)DipH);
-        c.DrawBitmap(_src, full);
-        using (var dim = new SKPaint { Color = new SKColor(0, 0, 0, 120) })
-            c.DrawRect(full, dim);
+        c.DrawBitmap(_dimmed, full);   // 预烘焙的「截图+压暗」，一次不透明铺满（替代 截图+全屏蒙版 两步）
 
         if (_sel.Width > 0 && _sel.Height > 0)
         {
