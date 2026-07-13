@@ -35,8 +35,6 @@ public partial class App : Application
             _host.Show();
 
             SetupTray();
-            // macOS：不在 Dock 显示图标，只保留菜单栏托盘图标（后台常驻）
-            if (OperatingSystem.IsMacOS()) Platform.MacWindow.HideDockIcon();
             try { _hotkey = PlatformServices.Current.RegisterHotkey(Capture); } catch { }
 
             // 隐藏自测：启动即触发一次截图，便于开发时验证覆盖层

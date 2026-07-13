@@ -15,8 +15,6 @@ public static class MacWindow
     struct NSRect { public double X, Y, W, H; }
 
     [DllImport(Objc)] static extern IntPtr sel_registerName(string name);
-    [DllImport(Objc)] static extern IntPtr objc_getClass(string name);
-    [DllImport(Objc, EntryPoint = "objc_msgSend")] static extern IntPtr MsgSend_Ret(IntPtr r, IntPtr sel);
     [DllImport(Objc, EntryPoint = "objc_msgSend")] static extern void MsgSend_Long(IntPtr r, IntPtr sel, long a);
     [DllImport(Objc, EntryPoint = "objc_msgSend")] static extern void MsgSend_ULong(IntPtr r, IntPtr sel, ulong a);
     [DllImport(Objc, EntryPoint = "objc_msgSend")] static extern void MsgSend_RectBool(IntPtr r, IntPtr sel, NSRect rect, [MarshalAs(UnmanagedType.I1)] bool b);
@@ -26,20 +24,6 @@ public static class MacWindow
     // NSWindowCollectionBehavior：FullScreenAuxiliary(1<<8) | Stationary(1<<4)
     // 不设 CanJoinAllSpaces —— 只留在当前 Space，避免触发 Spaces 重排把别的窗口挪动
     const ulong kCollectionBehavior = (1UL << 8) | (1UL << 4);
-
-    // NSApplicationActivationPolicy: Regular=0, Accessory=1, Prohibited=2
-    /// <summary>把 app 设为 Accessory：不在 Dock 显示图标（保留菜单栏托盘图标 + 可弹窗），
-    /// 后台常驻型。Avalonia 默认 Regular 会显示 Dock 图标，这里覆盖掉。</summary>
-    public static void HideDockIcon()
-    {
-        try
-        {
-            var app = MsgSend_Ret(objc_getClass("NSApplication"), sel_registerName("sharedApplication"));
-            if (app != IntPtr.Zero)
-                MsgSend_Long(app, sel_registerName("setActivationPolicy:"), 1); // Accessory
-        }
-        catch { }
-    }
 
     /// <param name="nsWindow">Avalonia TryGetPlatformHandle().Handle（macOS 下即 NSWindow*）</param>
     /// <param name="x">屏左下原点 X（点）</param><param name="y">屏左下原点 Y（点）</param>
