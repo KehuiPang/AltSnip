@@ -112,11 +112,11 @@ public sealed class OverlayControl : Control
     TextBox? _tb;
 
     // 主题色
-    static readonly SKColor C_GOLD = new(0xf4, 0xb7, 0x40);
-    static readonly SKColor C_TEXT = new(0xf3, 0xec, 0xe0);
-    static readonly SKColor C_TEXT2 = new(0xb0, 0x9b, 0x80);
-    static readonly SKColor C_DEEP = new(0x0e, 0x0a, 0x06);
-    static readonly SKColor C_CARD = new(0x1d, 0x15, 0x0b);
+    static readonly SKColor C_GOLD = new(0x6f, 0x9f, 0xad);
+    static readonly SKColor C_TEXT = new(0xf4, 0xf6, 0xf8);
+    static readonly SKColor C_TEXT2 = new(0x9a, 0xa7, 0xb2);
+    static readonly SKColor C_DEEP = new(0x16, 0x19, 0x1e);
+    static readonly SKColor C_CARD = new(0x1e, 0x26, 0x30);
 
     static readonly SKTypeface CjkFace = ResolveCjk();
     static readonly SKTypeface UiFace = SKTypeface.FromFamilyName("Segoe UI") ?? SKTypeface.Default;
@@ -137,6 +137,17 @@ public sealed class OverlayControl : Control
         }
         Focusable = true;
         Cursor = CurHidden;   // 隐藏系统灰十字，改用自绘金色准星
+    }
+
+    // 关键：遮罩关闭后必须释放三张大位图，否则每次截图泄漏 ~24MB，
+    // 累积到 1GB+ 会拖垮主线程，Windows 会把低层键盘钩子超时摘掉 → Alt+A 失效
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        try { _src?.Dispose(); } catch { }
+        try { _frame?.Dispose(); } catch { }
+        try { _dimmed?.Dispose(); } catch { }
+        try { _ava?.Dispose(); _ava = null; } catch { }
     }
 
     static SKTypeface ResolveCjk()
@@ -294,7 +305,7 @@ public sealed class OverlayControl : Control
         float tw = fp.MeasureText(s);
         float x = _sel.Left, y = _sel.Top - 6;
         if (y - 14 < 0) y = _sel.Top + 16;
-        using (var bg = new SKPaint { Color = new SKColor(0x0e, 0x0a, 0x06, 235) })
+        using (var bg = new SKPaint { Color = new SKColor(0x16, 0x19, 0x1e, 235) })
             c.DrawRect(new SKRect(x, y - 14, x + tw + 12, y + 4), bg);
         c.DrawText(s, x + 6, y, fp);
     }
@@ -305,7 +316,7 @@ public sealed class OverlayControl : Control
         using var fp = new SKPaint { Color = C_TEXT, IsAntialias = true, Typeface = CjkFace, TextSize = 15 };
         float tw = fp.MeasureText(s);
         float x = (float)(DipW - tw) / 2, y = 54;
-        using (var bg = new SKPaint { Color = new SKColor(0x0e, 0x0a, 0x06, 200) })
+        using (var bg = new SKPaint { Color = new SKColor(0x16, 0x19, 0x1e, 200) })
             c.DrawRoundRect(new SKRect(x - 18, y - 22, x + tw + 18, y + 10), 10, 10, bg);
         c.DrawText(s, x, y, fp);
     }
@@ -315,7 +326,7 @@ public sealed class OverlayControl : Control
     {
         using (var sh = new SKPaint { Color = new SKColor(0, 0, 0, 70), IsAntialias = true })
             c.DrawRoundRect(new SKRect(_bar.Left, _bar.Top + 3, _bar.Right, _bar.Bottom + 3), 10, 10, sh);
-        using (var bg = new SKPaint { Color = new SKColor(0x0e, 0x0a, 0x06, 205), IsAntialias = true })
+        using (var bg = new SKPaint { Color = new SKColor(0x16, 0x19, 0x1e, 205), IsAntialias = true })
             c.DrawRoundRect(_bar, 10, 10, bg);
 
         for (int i = 0; i < _rects.Length; i++)
@@ -336,7 +347,7 @@ public sealed class OverlayControl : Control
                 case 7: IconText(c, cell, ic); break;
                 case 8: IconMosaic(c, cell, ic); break;
                 case 10: IconLongShot(c, cell, ic); break;
-                case 4: IconUndo(c, cell, _annos.Count == 0 ? new SKColor(0xb0, 0x9b, 0x80, 90) : ic); break;
+                case 4: IconUndo(c, cell, _annos.Count == 0 ? new SKColor(0x9a, 0xa7, 0xb2, 90) : ic); break;
                 case 9: IconSave(c, cell, ic); break;
                 case 5: IconCross(c, cell, hover ? C_TEXT : C_TEXT2); break;
                 case 6: IconCheck(c, cell, C_GOLD); break;
@@ -347,7 +358,7 @@ public sealed class OverlayControl : Control
 
     void DrawStyleBar(SKCanvas c)
     {
-        using (var bg = new SKPaint { Color = new SKColor(0x0e, 0x0a, 0x06, 205), IsAntialias = true })
+        using (var bg = new SKPaint { Color = new SKColor(0x16, 0x19, 0x1e, 205), IsAntialias = true })
             c.DrawRoundRect(_styleBar, 9, 9, bg);
         for (int i = 0; i < PALETTE.Length; i++)
         {
@@ -472,7 +483,7 @@ public sealed class OverlayControl : Control
     void DrawHandles(SKCanvas c)
     {
         using var b = new SKPaint { Color = C_GOLD, IsAntialias = true };
-        using var pen = new SKPaint { Color = new SKColor(0x0e, 0x0a, 0x06, 180), IsStroke = true, StrokeWidth = 1 };
+        using var pen = new SKPaint { Color = new SKColor(0x16, 0x19, 0x1e, 180), IsStroke = true, StrokeWidth = 1 };
         foreach (var p in HandlePts())
         {
             var r = new SKRect(p.X - HS / 2, p.Y - HS / 2, p.X + HS / 2, p.Y + HS / 2);
@@ -717,8 +728,11 @@ public sealed class OverlayControl : Control
         int l = Math.Max(0, (int)(_sel.Left * _scale)), t = Math.Max(0, (int)(_sel.Top * _scale));
         int r = Math.Min(_src.Width, (int)(_sel.Right * _scale)), b = Math.Min(_src.Height, (int)(_sel.Bottom * _scale));
         if (r <= l || b <= t) return;
-        var f0 = new SKBitmap(r - l, b - t, SKColorType.Bgra8888, SKAlphaType.Premul);
-        if (!_src.ExtractSubset(f0, new SKRectI(l, t, r, b))) return;
+        // ExtractSubset 与 _src 共享像素；遮罩关闭会释放 _src，故必须深拷贝出独立首帧
+        using var view = new SKBitmap();
+        if (!_src.ExtractSubset(view, new SKRectI(l, t, r, b))) return;
+        var f0 = view.Copy();
+        if (f0 == null) return;
         OnLongShot(f0, _sel);
     }
 
