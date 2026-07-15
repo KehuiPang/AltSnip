@@ -1,10 +1,10 @@
 <p align="right"><b>English</b> · <a href="README.zh-CN.md">中文</a></p>
 
 <p align="center">
-  <img src="logo_256.png" width="104" alt="AltSnip">
+  <img src="logo_256.png" width="104" alt="Wuwei Shot">
 </p>
 
-<h1 align="center">AltSnip</h1>
+<h1 align="center">Wuwei Shot</h1>
 
 <p align="center">
   <b>Press <code>Alt&nbsp;+&nbsp;A</code>. Drag a box. It's on your clipboard.</b><br>
@@ -12,14 +12,14 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/v/release/KehuiPang/AltSnip?color=f4b740" alt="release">
+  <img src="https://img.shields.io/github/v/release/KehuiPang/wuwei-shot?color=f4b740" alt="release">
   <img src="https://img.shields.io/badge/platform-Windows%20%C2%B7%20macOS%20%C2%B7%20Linux-0078D6" alt="platform">
   <img src="https://img.shields.io/badge/license-MIT-2ebe6e" alt="license">
   <img src="https://img.shields.io/badge/runtime-self--contained-e0762a" alt="self-contained">
 </p>
 
 <p align="center">
-  <img src="docs/demo.png" width="720" alt="AltSnip demo — select, arrow, text, mosaic, copy">
+  <img src="docs/demo.png" width="720" alt="Wuwei Shot demo — select, arrow, text, mosaic, copy">
 </p>
 
 <p align="center">
@@ -28,7 +28,7 @@
 
 ---
 
-## Why AltSnip?
+## Why Wuwei Shot?
 
 I built the first version in an afternoon because WeChat froze while I was trying to grab a screenshot and I'd had enough. It turned out a genuinely nice snipping tool isn't much code — so it grew into this: one hotkey, capture, annotate, copy or save, free for everyone, on every desktop OS.
 
@@ -55,10 +55,10 @@ Grab the file for your OS from the [latest release](../../releases/latest):
 
 | OS | Download | How to run |
 | --- | --- | --- |
-| **Windows** (10/11) | `AltSnip-Windows-x64.exe` | Double-click. It lives in the tray. Press `Alt + A`. |
-| **macOS** (Apple Silicon) | `AltSnip-macOS-arm64.zip` | Unzip → right-click the app ▸ **Open** (unsigned). Grant Screen Recording. |
-| **macOS** (Intel) | `AltSnip-macOS-x64.zip` | Same as above. |
-| **Linux** | `AltSnip-Linux-x64.AppImage` | `chmod +x` then run. Needs `grim`/`scrot` + `wl-copy`/`xclip`. |
+| **Windows** (10/11) | `wuwei-shot-Windows-x64.exe` | Double-click. It lives in the tray. Press `Alt + A`. |
+| **macOS** (Apple Silicon) | `wuwei-shot-macOS-arm64.zip` | Unzip → right-click the app ▸ **Open** (unsigned). Grant Screen Recording. |
+| **macOS** (Intel) | `wuwei-shot-macOS-x64.zip` | Same as above. |
+| **Linux** | `wuwei-shot-Linux-x64.AppImage` | `chmod +x` then run. Needs `grim`/`scrot` + `wl-copy`/`xclip`. |
 
 > [!NOTE]
 > The Windows build is well tested. **macOS and Linux are still being validated on real hardware** — feedback very welcome. Global `Alt + A` works on Windows and X11 Linux; on macOS use the tray menu (system hotkey is coming).
@@ -67,7 +67,7 @@ Grab the file for your OS from the [latest release](../../releases/latest):
 
 Want it always ready? Add it to your startup / login items.
 
-> Heads-up: WeChat's default screenshot shortcut is also `Alt + A`. AltSnip uses a low-level keyboard hook so it wins that key — no settings to change.
+> Heads-up: WeChat's default screenshot shortcut is also `Alt + A`. Wuwei Shot uses a low-level keyboard hook so it wins that key — no settings to change.
 
 ## Shortcuts
 
@@ -91,7 +91,7 @@ Want it always ready? Add it to your startup / login items.
 **Cross-platform** (needs the .NET 8 SDK):
 
 ```bash
-dotnet run --project cross/AltSnip.Desktop.csproj
+dotnet run --project cross/WuweiShot.Desktop.csproj
 ```
 
 **Classic Windows** (no Visual Studio needed — Windows already ships the C# compiler):

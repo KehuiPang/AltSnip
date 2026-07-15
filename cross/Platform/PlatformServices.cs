@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace AltSnip.Platform;
+namespace WuweiShot.Platform;
 
 /// <summary>按当前操作系统挑选实现。</summary>
 public static class PlatformServices

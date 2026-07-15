@@ -1,7 +1,7 @@
 using System;
 using Avalonia;
 
-namespace AltSnip;
+namespace WuweiShot;
 
 internal static class Program
 {

@@ -1,6 +1,6 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="AltSnip.App">
+             x:Class="WuweiShot.App">
   <Application.Styles>
     <FluentTheme />
   </Application.Styles>

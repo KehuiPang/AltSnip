@@ -1,4 +1,4 @@
-// AltSnip 演示动画生成器（不打进正式 exe，只用于生成 docs/demo.gif）。
+// 无为截 演示动画生成器（不打进正式 exe，只用于生成 docs/demo.gif）。
 // 用工具自己的渲染引擎，在一个虚构的“订单详情”界面上自动演示
 // 框选 -> 箭头 -> 打字 -> 马赛克 -> 复制 的全过程，导出为循环 GIF。
 // 编译： csc /target:winexe /out:DemoGen.exe /main:SnipTool.DemoGen \

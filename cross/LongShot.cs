@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
-using AltSnip.Platform;
+using WuweiShot.Platform;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -11,7 +11,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using SkiaSharp;
 
-namespace AltSnip;
+namespace WuweiShot;
 
 /// <summary>长截图：遮罩关闭后，自动向下滚动 + 连续抓取选区 + 拼接，最后弹出结果窗。</summary>
 public static class LongShot
@@ -88,7 +88,7 @@ public static class LongShot
         {
             var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
             {
-                SuggestedFileName = "AltSnip-long.png",
+                SuggestedFileName = "wuwei-shot-long.png",
                 DefaultExtension = "png",
                 FileTypeChoices = new[] { new FilePickerFileType("PNG") { Patterns = new[] { "*.png" } } },
             });

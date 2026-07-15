@@ -10,7 +10,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using SkiaSharp;
 
-namespace AltSnip;
+namespace WuweiShot;
 
 public enum Tool { None, Arrow, Line, Rect, Text, Mosaic }
 
@@ -812,7 +812,7 @@ public sealed class OverlayControl : Control
         if (top == null) return;
         var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            SuggestedFileName = "AltSnip.png",
+            SuggestedFileName = "wuwei-shot.png",
             DefaultExtension = "png",
             FileTypeChoices = new[] { new FilePickerFileType("PNG") { Patterns = new[] { "*.png" } } },
         });

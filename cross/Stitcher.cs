@@ -1,7 +1,7 @@
 using System;
 using SkiaSharp;
 
-namespace AltSnip;
+namespace WuweiShot;
 
 /// <summary>长截图拼接：相邻帧顶部与已拼图底部滑动匹配，找重叠后接上新内容。（算法已用合成数据验证）</summary>
 public static class Stitcher

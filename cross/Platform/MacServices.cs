@@ -5,7 +5,7 @@ using Avalonia;
 using Avalonia.Threading;
 using SkiaSharp;
 
-namespace AltSnip.Platform;
+namespace WuweiShot.Platform;
 
 /// <summary>macOS 实现：CoreGraphics 进程内截屏 + osascript 写图片剪贴板 + Carbon 全局热键 Alt+A。</summary>
 public sealed class MacServices : IPlatformServices

@@ -1,6 +1,6 @@
-# AltSnip — cross-platform (Windows / macOS / Linux)
+# Wuwei Shot — cross-platform (Windows / macOS / Linux)
 
-A ground-up rewrite of AltSnip on [Avalonia](https://avaloniaui.net/) so it runs on
+A ground-up rewrite of Wuwei Shot on [Avalonia](https://avaloniaui.net/) so it runs on
 **Windows, macOS, and Linux** from one codebase — shipped as the `v2.x` releases.
 The original `../src/Snip.cs` is a Windows-only WinForms build kept around as an
 ultra-light option (`v1.x`).
@@ -48,7 +48,7 @@ has no .NET SDK, so CI is the source of truth.
 Requires the .NET 8 SDK.
 
 ```bash
-dotnet run --project cross/AltSnip.Desktop.csproj
+dotnet run --project cross/WuweiShot.Desktop.csproj
 # or publish a self-contained single file:
-dotnet publish cross/AltSnip.Desktop.csproj -c Release -r linux-x64 --self-contained -p:PublishSingleFile=true
+dotnet publish cross/WuweiShot.Desktop.csproj -c Release -r linux-x64 --self-contained -p:PublishSingleFile=true
 ```

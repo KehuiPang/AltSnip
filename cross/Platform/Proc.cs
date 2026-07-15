@@ -2,7 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 
-namespace AltSnip.Platform;
+namespace WuweiShot.Platform;
 
 /// <summary>跑外部命令的小工具（macOS/Linux 用系统截图/剪贴板命令）。</summary>
 internal static class Proc

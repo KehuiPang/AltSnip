@@ -1,4 +1,4 @@
-# AltSnip build script — compiles src\Snip.cs into Snip.exe using the C# compiler bundled with Windows.
+# 无为截 build script — compiles src\Snip.cs into Snip.exe using the C# compiler bundled with Windows.
 # Usage:  powershell -ExecutionPolicy Bypass -File build.ps1
 
 $ErrorActionPreference = "Stop"

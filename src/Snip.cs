@@ -63,7 +63,7 @@ namespace SnipTool
 
             _tray = new NotifyIcon();
             _tray.Icon = appIcon;
-            _tray.Text = "AltSnip 截图 (Alt+A)";
+            _tray.Text = "无为截 截图 (Alt+A)";
             _tray.Visible = true;
 
             var menu = new ContextMenuStrip();
@@ -696,7 +696,7 @@ namespace SnipTool
                 using (var dlg = new SaveFileDialog())
                 {
                     dlg.Filter = "PNG 图片|*.png";
-                    dlg.FileName = "AltSnip_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".png";
+                    dlg.FileName = "wuwei-shot_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".png";
                     try { dlg.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures); }
                     catch { }
                     if (dlg.ShowDialog() == DialogResult.OK)

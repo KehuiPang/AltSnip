@@ -1,10 +1,10 @@
 <p align="right"><a href="README.md">English</a> · <b>中文</b></p>
 
 <p align="center">
-  <img src="logo_256.png" width="104" alt="AltSnip">
+  <img src="logo_256.png" width="104" alt="无为截">
 </p>
 
-<h1 align="center">AltSnip</h1>
+<h1 align="center">无为截</h1>
 
 <p align="center">
   <b>按 <code>Alt&nbsp;+&nbsp;A</code>,拖个框,截图就进了剪贴板。</b><br>
@@ -12,14 +12,14 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/v/release/KehuiPang/AltSnip?color=f4b740" alt="release">
+  <img src="https://img.shields.io/github/v/release/KehuiPang/wuwei-shot?color=f4b740" alt="release">
   <img src="https://img.shields.io/badge/platform-Windows%20%C2%B7%20macOS%20%C2%B7%20Linux-0078D6" alt="platform">
   <img src="https://img.shields.io/badge/license-MIT-2ebe6e" alt="license">
   <img src="https://img.shields.io/badge/runtime-self--contained-e0762a" alt="self-contained">
 </p>
 
 <p align="center">
-  <img src="docs/demo.png" width="720" alt="AltSnip 演示 — 框选、箭头、文字、马赛克、复制">
+  <img src="docs/demo.png" width="720" alt="无为截 演示 — 框选、箭头、文字、马赛克、复制">
 </p>
 
 <p align="center">
@@ -55,10 +55,10 @@
 
 | 系统 | 下载 | 怎么运行 |
 | --- | --- | --- |
-| **Windows**(10/11) | `AltSnip-Windows-x64.exe` | 双击,待在托盘,按 `Alt + A`。 |
-| **macOS**(Apple 芯片) | `AltSnip-macOS-arm64.zip` | 解压 → 右键应用 ▸ **打开**(未签名),授予屏幕录制权限。 |
-| **macOS**(Intel) | `AltSnip-macOS-x64.zip` | 同上。 |
-| **Linux** | `AltSnip-Linux-x64.AppImage` | `chmod +x` 后运行,需要 `grim`/`scrot` + `wl-copy`/`xclip`。 |
+| **Windows**(10/11) | `wuwei-shot-Windows-x64.exe` | 双击,待在托盘,按 `Alt + A`。 |
+| **macOS**(Apple 芯片) | `wuwei-shot-macOS-arm64.zip` | 解压 → 右键应用 ▸ **打开**(未签名),授予屏幕录制权限。 |
+| **macOS**(Intel) | `wuwei-shot-macOS-x64.zip` | 同上。 |
+| **Linux** | `wuwei-shot-Linux-x64.AppImage` | `chmod +x` 后运行,需要 `grim`/`scrot` + `wl-copy`/`xclip`。 |
 
 > [!NOTE]
 > Windows 版已充分测试。**macOS / Linux 仍在真机验证中**,欢迎反馈。全局 `Alt + A` 在 Windows 与 X11 Linux 可用;macOS 暂用托盘菜单触发(系统级热键待补)。
@@ -67,7 +67,7 @@
 
 想开机自启:把它加进各系统的启动项即可。
 
-> 提醒:微信截图默认快捷键也是 `Alt + A`。AltSnip 用底层键盘钩子拦截,谁先抢注都无效,不用改设置。
+> 提醒:微信截图默认快捷键也是 `Alt + A`。无为截 用底层键盘钩子拦截,谁先抢注都无效,不用改设置。
 
 ## 快捷键
 
@@ -91,7 +91,7 @@
 **跨平台**(需要 .NET 8 SDK):
 
 ```bash
-dotnet run --project cross/AltSnip.Desktop.csproj
+dotnet run --project cross/WuweiShot.Desktop.csproj
 ```
 
 **经典 Windows 版**(不用 Visual Studio,Windows 自带 C# 编译器):

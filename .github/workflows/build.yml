@@ -33,7 +33,7 @@ jobs:
 
       - name: Publish
         run: >
-          dotnet publish cross/AltSnip.Desktop.csproj
+          dotnet publish cross/WuweiShot.Desktop.csproj
           -c Release
           -r ${{ matrix.rid }}
           --self-contained true
@@ -43,5 +43,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: AltSnip-${{ matrix.rid }}
+          name: wuwei-shot-${{ matrix.rid }}
           path: out/${{ matrix.rid }}

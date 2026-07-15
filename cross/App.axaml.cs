@@ -1,12 +1,12 @@
 using System;
-using AltSnip.Platform;
+using WuweiShot.Platform;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
 
-namespace AltSnip;
+namespace WuweiShot;
 
 public partial class App : Application
 {
@@ -48,13 +48,13 @@ public partial class App : Application
     }
 
     private static WindowIcon LoadIcon()
-        => new WindowIcon(AssetLoader.Open(new Uri("avares://AltSnip/Assets/logo.png")));
+        => new WindowIcon(AssetLoader.Open(new Uri("avares://WuweiShot/Assets/logo.png")));
 
     private void SetupTray()
     {
         // macOS 全局热键 Option+A(=Alt+A)，用 CGEventTap 拦截、优先级高于微信；其它平台 Alt+A
         string hk = OperatingSystem.IsMacOS() ? "⌥A" : "Alt+A";
-        var tray = new TrayIcon { ToolTipText = $"AltSnip — {hk} to capture", Icon = LoadIcon() };
+        var tray = new TrayIcon { ToolTipText = $"无为截 — {hk} to capture", Icon = LoadIcon() };
         tray.Clicked += (_, _) => Capture();
 
         var menu = new NativeMenu();

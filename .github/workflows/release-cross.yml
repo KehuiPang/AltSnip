@@ -25,7 +25,7 @@ jobs:
           set -e
           for rid in win-x64 osx-arm64 osx-x64 linux-x64; do
             echo "== publishing $rid =="
-            dotnet publish cross/AltSnip.Desktop.csproj -c Release -r $rid \
+            dotnet publish cross/WuweiShot.Desktop.csproj -c Release -r $rid \
               --self-contained true -p:PublishSingleFile=true \
               -p:IncludeNativeLibrariesForSelfExtract=true -o out/$rid
           done
@@ -37,23 +37,23 @@ jobs:
         with:
           tag_name: v2.0.0
           target_commitish: cross-platform
-          name: AltSnip v2.0.0 — cross-platform (Windows / macOS / Linux)
+          name: Wuwei Shot v2.0.0 — cross-platform (Windows / macOS / Linux)
           prerelease: false
           make_latest: 'true'
           files: dist/*
           body: |
-            The **cross-platform AltSnip** — one codebase (Avalonia + SkiaSharp) for
+            The **cross-platform Wuwei Shot** — one codebase (Avalonia + SkiaSharp) for
             **Windows, macOS, and Linux**. Feature-complete: capture, move/resize the box,
             arrow / line / rectangle / text (IME) / mosaic, colors & thickness, copy, and
             save-as-PNG. Tray icon triggers a capture on every OS; global `Alt + A` works
             on Windows (and X11 Linux).
 
             ### Downloads
-            - **Windows** — `AltSnip-Windows-x64.exe`. Run it (tray icon), press `Alt + A`. ✅ tested.
-            - **macOS** — `AltSnip-macOS-arm64.zip` (Apple silicon) / `-x64.zip` (Intel).
+            - **Windows** — `wuwei-shot-Windows-x64.exe`. Run it (tray icon), press `Alt + A`. ✅ tested.
+            - **macOS** — `wuwei-shot-macOS-arm64.zip` (Apple silicon) / `-x64.zip` (Intel).
               Unzip, then right-click ▸ Open the app (unsigned); needs Screen Recording
               permission. ⚠️ not yet tested on real hardware.
-            - **Linux** — `AltSnip-Linux-x64.AppImage`. `chmod +x`, double-click or run.
+            - **Linux** — `wuwei-shot-Linux-x64.AppImage`. `chmod +x`, double-click or run.
               Needs `grim`/`scrot` for capture and `wl-copy`/`xclip` for clipboard.
               ⚠️ not yet tested on real hardware.
 

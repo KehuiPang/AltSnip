@@ -6,7 +6,7 @@ using Avalonia;
 using Avalonia.Threading;
 using SkiaSharp;
 
-namespace AltSnip.Platform;
+namespace WuweiShot.Platform;
 
 /// <summary>Linux 实现：grim/scrot/ImageMagick 截屏 + xclip/wl-copy 图片剪贴板。全局热键待 M2。</summary>
 public sealed class LinuxServices : IPlatformServices
@@ -15,7 +15,7 @@ public sealed class LinuxServices : IPlatformServices
 
     public SKBitmap CaptureRegion(PixelRect region)
     {
-        string tmp = Path.Combine(Path.GetTempPath(), "altsnip_capture.png");
+        string tmp = Path.Combine(Path.GetTempPath(), "wuwei-shot_capture.png");
         int w = Math.Max(1, region.Width), h = Math.Max(1, region.Height);
 
         // Wayland：grim 支持直接抠区域
@@ -43,7 +43,7 @@ public sealed class LinuxServices : IPlatformServices
 
     public void CopyImageToClipboard(SKImage image)
     {
-        string tmp = Path.Combine(Path.GetTempPath(), "altsnip_copy.png");
+        string tmp = Path.Combine(Path.GetTempPath(), "wuwei-shot_copy.png");
         using (var data = image.Encode(SKEncodedImageFormat.Png, 100))
         using (var fs = File.Create(tmp))
             data.SaveTo(fs);
@@ -90,7 +90,7 @@ public sealed class LinuxServices : IPlatformServices
             _keycode = XKeysymToKeycode(_display, (IntPtr)0x61); // XK_a
             foreach (uint extra in new uint[] { 0, Lock, Mod2, Lock | Mod2 })
                 XGrabKey(_display, _keycode, Mod1 | extra, _root, true, GrabModeAsync, GrabModeAsync);
-            _thread = new Thread(Loop) { IsBackground = true, Name = "AltSnip-x11-hotkey" };
+            _thread = new Thread(Loop) { IsBackground = true, Name = "wuwei-shot-x11-hotkey" };
             _thread.Start();
         }
 

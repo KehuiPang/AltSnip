@@ -5,7 +5,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using SkiaSharp;
 
-namespace AltSnip;
+namespace WuweiShot;
 
 /// <summary>无边框置顶取景窗：一个盖住目标屏的普通置顶窗（不进 macOS 原生全屏，
 /// 避免滑入独立 Space 把其它窗口推走）。底下窗口保持不动，在冻结的截图上画框，无缝。</summary>

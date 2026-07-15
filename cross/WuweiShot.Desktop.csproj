@@ -9,8 +9,8 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-    <AssemblyName>AltSnip</AssemblyName>
-    <RootNamespace>AltSnip</RootNamespace>
+    <AssemblyName>WuweiShot</AssemblyName>
+    <RootNamespace>WuweiShot</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

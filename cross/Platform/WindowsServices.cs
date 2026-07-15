@@ -4,7 +4,7 @@ using Avalonia;
 using Avalonia.Threading;
 using SkiaSharp;
 
-namespace AltSnip.Platform;
+namespace WuweiShot.Platform;
 
 /// <summary>Windows 原生实现：BitBlt 截屏 / CF_DIB 图片剪贴板 / WH_KEYBOARD_LL 全局热键。</summary>
 public sealed class WindowsServices : IPlatformServices

@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 
-namespace AltSnip.Platform;
+namespace WuweiShot.Platform;
 
 /// <summary>把一个无边框 NSWindow 抬到"遮罩层级"并铺满整屏（含菜单栏/Dock 区域），
 /// 但仍留在当前 Space——避免 macOS 原生全屏把窗口滑进独立 Space 把别的窗口推走。

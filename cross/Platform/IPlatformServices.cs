@@ -2,7 +2,7 @@ using System;
 using Avalonia;
 using SkiaSharp;
 
-namespace AltSnip.Platform;
+namespace WuweiShot.Platform;
 
 /// <summary>
 /// 每个操作系统各自实现的原生能力。UI 与标注逻辑是可移植的共享层，
