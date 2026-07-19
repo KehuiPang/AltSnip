@@ -57,7 +57,7 @@ public sealed class OverlayWindow : Window
             Math.Max(1, (int)(selDip.Height * scale)));
         Close();
         Avalonia.Threading.Dispatcher.UIThread.Post(
-            async () => { try { await LongShot.Run(region, frame0); } catch { } },
+            () => { try { LongShot.Run(region, frame0, _scaling, _bounds); } catch { } },
             Avalonia.Threading.DispatcherPriority.Background);
     }
 

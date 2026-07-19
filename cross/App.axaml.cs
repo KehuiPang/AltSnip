@@ -38,13 +38,48 @@ public partial class App : Application
             try { _hotkey = PlatformServices.Current.RegisterHotkey(Capture); } catch { }
 
             // 隐藏自测：启动即触发一次截图，便于开发时验证覆盖层
-            foreach (var a in Environment.GetCommandLineArgs())
+            var cmd = Environment.GetCommandLineArgs();
+            foreach (var a in cmd)
                 if (a == "--test-capture")
                     Avalonia.Threading.Dispatcher.UIThread.Post(Capture,
                         Avalonia.Threading.DispatcherPriority.Background);
+
+            // 隐藏自测：--selftest-longshot x y w h —— 用固定选区直接跑长截图会话(免手动拖选)，
+            // 供开发时截图验证蒙层盖满/按钮亮显/预览首帧。坐标为物理像素，缺省居中 700x500。
+            for (int i = 0; i < cmd.Length; i++)
+                if (cmd[i] == "--selftest-longshot")
+                {
+                    int gx = i + 1 < cmd.Length && int.TryParse(cmd[i + 1], out var vx) ? vx : int.MinValue;
+                    int gy = i + 2 < cmd.Length && int.TryParse(cmd[i + 2], out var vy) ? vy : 0;
+                    int gw = i + 3 < cmd.Length && int.TryParse(cmd[i + 3], out var vw) ? vw : 700;
+                    int gh = i + 4 < cmd.Length && int.TryParse(cmd[i + 4], out var vh) ? vh : 500;
+                    Avalonia.Threading.Dispatcher.UIThread.Post(
+                        () => SelfTestLongShot(gx, gy, gw, gh),
+                        Avalonia.Threading.DispatcherPriority.Background);
+                }
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private void SelfTestLongShot(int gx, int gy, int gw, int gh)
+    {
+        try
+        {
+            var all = _host?.Screens.All;
+            if (all == null || all.Count == 0) return;
+            var cur = PlatformServices.Current.CursorPosition();
+            var screen = (cur.HasValue ? _host!.Screens.ScreenFromPoint(cur.Value) : null)
+                         ?? _host!.Screens.Primary ?? all[0];
+            var b = screen.Bounds;
+            // 缺省居中；给定坐标则相对该屏原点
+            int x = gx == int.MinValue ? b.X + (b.Width - gw) / 2 : b.X + gx;
+            int y = gx == int.MinValue ? b.Y + (b.Height - gh) / 2 : b.Y + gy;
+            var region = new PixelRect(x, y, Math.Min(gw, b.Width), Math.Min(gh, b.Height));
+            var frame0 = PlatformServices.Current.CaptureRegion(region);
+            LongShot.Run(region, frame0, screen.Scaling, b);
+        }
+        catch { }
     }
 
     private static WindowIcon LoadIcon()

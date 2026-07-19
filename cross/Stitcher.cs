@@ -74,4 +74,74 @@ public static class Stitcher
         acc.Dispose();
         return res;
     }
+
+    /// <summary>增量拼接累加器：避免每帧重建整张大图(O(n²))。
+    /// 每帧只裁出"新内容"存为一条切片，最后一次性合成(O(n))；匹配只对最近 tail 段做，成本恒定。</summary>
+    public sealed class Accumulator : IDisposable
+    {
+        readonly System.Collections.Generic.List<SKBitmap> _slices = new();
+        SKBitmap _tail;            // 已拼内容的尾部若干行，作为下一帧的匹配参照
+        const int TAIL = 760;      // 尾段高度上限(≥FindNewStart 的 720 搜索窗)
+        public int Width { get; }
+        public int Height { get; private set; }
+
+        public Accumulator(SKBitmap frame0)
+        {
+            Width = frame0.Width;
+            _slices.Add(Copy(frame0));
+            Height = frame0.Height;
+            _tail = TailOf(frame0);
+        }
+
+        /// <summary>喂入一帧；有新内容则追加并返回 true。仅做恒定成本的 tail 匹配 + 一次小拷贝。</summary>
+        public bool Feed(SKBitmap f)
+        {
+            if (f.Width != Width) return false;
+            int start = FindNewStart(_tail, f);
+            int add = f.Height - start;
+            if (add < 4) return false;             // 无可靠新内容
+            var slice = new SKBitmap(Width, add, SKColorType.Bgra8888, SKAlphaType.Premul);
+            using (var c = new SKCanvas(slice))
+                c.DrawBitmap(f, new SKRect(0, start, Width, f.Height), new SKRect(0, 0, Width, add));
+            _slices.Add(slice);
+            Height += add;
+            var oldTail = _tail; _tail = TailOf(f); oldTail.Dispose();
+            return true;
+        }
+
+        /// <summary>一次性合成最终长图(单遍 O(总高))。</summary>
+        public SKBitmap Compose()
+        {
+            var res = new SKBitmap(Width, Math.Max(1, Height), SKColorType.Bgra8888, SKAlphaType.Premul);
+            using (var c = new SKCanvas(res))
+            {
+                int y = 0;
+                foreach (var s in _slices) { c.DrawBitmap(s, 0, y); y += s.Height; }
+            }
+            return res;
+        }
+
+        static SKBitmap TailOf(SKBitmap f)
+        {
+            int h = Math.Min(TAIL, f.Height);
+            var t = new SKBitmap(f.Width, h, SKColorType.Bgra8888, SKAlphaType.Premul);
+            using (var c = new SKCanvas(t))
+                c.DrawBitmap(f, new SKRect(0, f.Height - h, f.Width, f.Height), new SKRect(0, 0, f.Width, h));
+            return t;
+        }
+
+        static SKBitmap Copy(SKBitmap f)
+        {
+            var b = new SKBitmap(f.Width, f.Height, SKColorType.Bgra8888, SKAlphaType.Premul);
+            using (var c = new SKCanvas(b)) c.DrawBitmap(f, 0, 0);
+            return b;
+        }
+
+        public void Dispose()
+        {
+            foreach (var s in _slices) s.Dispose();
+            _slices.Clear();
+            _tail?.Dispose();
+        }
+    }
 }
