@@ -209,6 +209,7 @@ internal sealed class LongSession
         SKBitmap result;
         try { result = _acc.Compose(); } catch { CloseChrome(); _acc.Dispose(); return; }
         CloseChrome();
+        Account.Track("client_usage", new { product = "shot" });
         _ = SaveToFileAsync(result);
     }
 

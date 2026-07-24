@@ -79,4 +79,45 @@ internal static class Account
             bal = b.GetInt64();
         return new MeInfo(name, email, bal);
     }
+
+    /// <summary>读/生成 ~/.wuwei/anon_id（稳定设备标识）</summary>
+    public static string GetAnonId()
+    {
+        try
+        {
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".wuwei");
+            Directory.CreateDirectory(dir);
+            var file = Path.Combine(dir, "anon_id");
+            if (File.Exists(file))
+            {
+                var s = File.ReadAllText(file).Trim();
+                if (!string.IsNullOrEmpty(s)) return s;
+            }
+            var id = Guid.NewGuid().ToString();
+            File.WriteAllText(file, id);
+            return id;
+        }
+        catch { return "unknown"; }
+    }
+
+    /// <summary>fire-and-forget 埋点（不阻塞、失败静默）</summary>
+    public static void Track(string eventType, object? meta = null)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var body = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    event_type = eventType,
+                    anon_id = GetAnonId(),
+                    path = "/app",
+                    meta = meta ?? new { product = "shot" },
+                });
+                using var content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
+                await Http.PostAsync($"{Site}/api/track", content);
+            }
+            catch { /* 静默 */ }
+        });
+    }
 }

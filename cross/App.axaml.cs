@@ -63,6 +63,8 @@ public partial class App : Application
                 }
         }
 
+        // 埋点：应用激活
+        Account.Track("client_activate", new { product = "shot" });
         base.OnFrameworkInitializationCompleted();
     }
 
@@ -182,6 +184,7 @@ public partial class App : Application
                     email = qs["email"]
                 }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
                 System.IO.File.WriteAllText(System.IO.Path.Combine(authDir, "auth.json"), json);
+                Account.Track("client_login", new { product = "shot" });
             }
             var bytes = System.Text.Encoding.UTF8.GetBytes(html);
             ctx.Response.ContentType = "text/html; charset=utf-8";
